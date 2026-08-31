@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.bidly.CheckNeonDataTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-08-28T11:55:17" hostname="DESKTOP-AMTTKL1" time="2.541">
+  <properties/>
+  <testcase name="checkData()" classname="com.bidly.CheckNeonDataTest" time="2.541"/>
+  <system-out><![CDATA[=== NEON DB: LISTINGS & MEDIA ===
+Updated rfgg seller to Dhaya successfully!
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

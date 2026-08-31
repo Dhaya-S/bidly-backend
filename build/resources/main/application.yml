@@ -1,0 +1,97 @@
+spring:
+  application:
+    name: bidly-backend
+
+  # ─── Multipart File Uploads ─────────────────────────────────
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 500MB           # Max single file size (images + videos)
+      max-request-size: 500MB       # Max total request size (multiple files)
+
+  # ─── Neon PostgreSQL ───────────────────────────────────────
+  datasource:
+    url: ${NEON_DB_URL}                  # jdbc:postgresql://<host>/bidlydb?sslmode=require
+    username: ${NEON_DB_USERNAME}
+    password: ${NEON_DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 3
+      connection-timeout: 10000
+      validation-timeout: 2000
+      idle-timeout: 30000        # 30s
+      max-lifetime: 45000        # 45s (keeps connections fresh for Neon serverless pooler)
+      keepalive-time: 15000       # 15s proactive ping
+
+  # ─── JPA / Hibernate ───────────────────────────────────────
+  jpa:
+    hibernate:
+      ddl-auto: none                     # Flyway manages schema migrations
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        default_schema: public
+
+  # ─── Flyway Migrations ─────────────────────────────────────
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    validate-on-migrate: false
+
+# ─── Server ──────────────────────────────────────────────────
+server:
+  port: 8081
+  servlet:
+    context-path: /api
+  tomcat:
+    max-swallow-size: -1              # Don't limit request body swallowing
+    max-http-form-post-size: -1       # No limit on form POST size
+
+# ─── JWT ─────────────────────────────────────────────────────
+jwt:
+  secret: ${JWT_SECRET}                  # min 256-bit base64 encoded string
+  expiration-ms: 86400000                # 24 hours
+  refresh-expiration-ms: 604800000       # 7 days
+
+# ─── Cloudflare R2 ───────────────────────────────────────────
+cloudflare:
+  r2:
+    account-id: ${CF_ACCOUNT_ID}
+    access-key-id: ${CF_R2_ACCESS_KEY_ID}
+    secret-access-key: ${CF_R2_SECRET_ACCESS_KEY}
+    bucket-name: ${CF_R2_BUCKET_NAME}
+    public-url: ${CF_R2_PUBLIC_URL}      # e.g. https://pub-xxx.r2.dev
+    presigned-url-expiry-minutes: 15
+
+# ─── Media Video Processing Pipeline (FFmpeg / Fast-Start) ───
+media:
+  video:
+    ffmpeg-path: ${FFMPEG_PATH:ffmpeg}
+    ffprobe-path: ${FFPROBE_PATH:ffprobe}
+    max-duration-seconds: 60
+    max-size-bytes: 104857600           # 100 MB
+    max-concurrent-jobs: 2
+    timeout-seconds: 120
+
+# ─── Fast2SMS OTP ───────────────────────────────────────────
+fast2sms:
+  api-key: ${FAST2SMS_API_KEY}
+  otp-id: ${FAST2SMS_OTP_ID}
+  send-url: https://www.fast2sms.com/dev/otp/send
+  verify-url: https://www.fast2sms.com/dev/otp/verify
+
+# ─── Bidly Dev Features ──────────────────────────────────────
+bidly:
+  dev-wallet:
+    enabled: ${DEV_WALLET_ENABLED:true}
+    initial-balance: 50000.00
+
+# ─── Logging ─────────────────────────────────────────────────
+logging:
+  level:
+    com.bidly: DEBUG
+    org.hibernate.SQL: WARN
+    org.springframework.security: WARN

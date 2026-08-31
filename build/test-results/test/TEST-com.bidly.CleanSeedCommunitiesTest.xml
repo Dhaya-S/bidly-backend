@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.bidly.CleanSeedCommunitiesTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-08-28T11:55:24" hostname="DESKTOP-AMTTKL1" time="3.02">
+  <properties/>
+  <testcase name="cleanSeeds()" classname="com.bidly.CleanSeedCommunitiesTest" time="3.02"/>
+  <system-out><![CDATA[Deleted 0 dummy seed communities from Neon DB.
+Remaining Community: 9a19dd9c-ccf1-4f66-b3f8-bc669e5f00c3 | ggggf | created_by: c0d02ec2-54d4-43a0-9204-89da3bcc09ac
+Remaining Community: 092769de-721c-4bad-ba25-4afae36dd9f6 | jjjj | created_by: cd9cb12e-ce5a-4968-a3d3-a19ff2e2288e
+Remaining Community: c5da35cf-81a4-4521-8eaf-d3ec0282f6fd | dhaya | created_by: c6f162d0-8914-4c40-b5c0-aa780ee63ee3
+Remaining Community: 1be05e22-fb00-4f1a-885b-cdeb9dbe4573 | yrv | created_by: c0d02ec2-54d4-43a0-9204-89da3bcc09ac
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

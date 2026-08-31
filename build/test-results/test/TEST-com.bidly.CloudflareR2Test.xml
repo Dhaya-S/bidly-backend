@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.bidly.CloudflareR2Test" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-08-28T11:55:27" hostname="DESKTOP-AMTTKL1" time="2.502">
+  <properties/>
+  <testcase name="testUploadToR2()" classname="com.bidly.CloudflareR2Test" time="2.502"/>
+  <system-out><![CDATA[Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+Testing putObject with PATH style...
+>>> SUCCESS (Path Style): Uploaded file to Cloudflare R2!
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

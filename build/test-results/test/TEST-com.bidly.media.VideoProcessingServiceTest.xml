@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.bidly.media.VideoProcessingServiceTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-08-28T11:55:30" hostname="DESKTOP-AMTTKL1" time="2.108">
+  <properties/>
+  <testcase name="Calculate output resolution: 4K portrait scales down to 1080x1920" classname="com.bidly.media.VideoProcessingServiceTest" time="0.402"/>
+  <testcase name="Calculate output resolution: 1080p portrait remains untouched" classname="com.bidly.media.VideoProcessingServiceTest" time="0.116"/>
+  <testcase name="Calculate output resolution: Enforces even dimensions" classname="com.bidly.media.VideoProcessingServiceTest" time="0.128"/>
+  <testcase name="Fast-start atom verification on synthesized MP4" classname="com.bidly.media.VideoProcessingServiceTest" time="1.032"/>
+  <testcase name="Calculate output resolution: Small SD video is never upscaled" classname="com.bidly.media.VideoProcessingServiceTest" time="0.152"/>
+  <testcase name="Calculate output resolution: 720p portrait remains untouched" classname="com.bidly.media.VideoProcessingServiceTest" time="0.129"/>
+  <testcase name="Calculate output resolution: 4K landscape scales down to 1920x1080" classname="com.bidly.media.VideoProcessingServiceTest" time="0.144"/>
+  <system-out><![CDATA[17:25:30.652 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Initialized with maxConcurrentJobs=2, maxDuration=60s, maxSize=100MB
+17:25:30.656 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Resolved FFmpeg: 'ffmpeg', FFprobe: 'ffprobe'
+17:25:30.776 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Initialized with maxConcurrentJobs=2, maxDuration=60s, maxSize=100MB
+17:25:30.776 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Resolved FFmpeg: 'ffmpeg', FFprobe: 'ffprobe'
+17:25:30.902 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Initialized with maxConcurrentJobs=2, maxDuration=60s, maxSize=100MB
+17:25:30.903 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Resolved FFmpeg: 'ffmpeg', FFprobe: 'ffprobe'
+17:25:31.069 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Initialized with maxConcurrentJobs=2, maxDuration=60s, maxSize=100MB
+17:25:31.070 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Resolved FFmpeg: 'ffmpeg', FFprobe: 'ffprobe'
+17:25:31.457 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] START file=source_073eb11d-dd80-4911-b28d-97ea2caf26de.mp4 size=12.8 KB
+17:25:31.561 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] INPUT resolution=320x240 duration=2.00s vCodec=h264 aCodec=none bitrate=52kbps
+17:25:31.561 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] OUTPUT resolution=320x240 (Aspect ratio preserved, max 1080p)
+17:25:31.561 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] FFMPEG START transcoding...
+17:25:31.801 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] FFMPEG COMPLETE in 239ms, outputSize=13.5 KB
+17:25:31.802 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] THUMBNAIL START generating poster frame...
+17:25:31.931 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] THUMBNAIL COMPLETE thumbSize=8.9 KB
+17:25:31.932 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] FAST_START verification: PASS
+17:25:32.090 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Initialized with maxConcurrentJobs=2, maxDuration=60s, maxSize=100MB
+17:25:32.091 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Resolved FFmpeg: 'ffmpeg', FFprobe: 'ffprobe'
+17:25:32.222 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Initialized with maxConcurrentJobs=2, maxDuration=60s, maxSize=100MB
+17:25:32.223 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Resolved FFmpeg: 'ffmpeg', FFprobe: 'ffprobe'
+17:25:32.366 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Initialized with maxConcurrentJobs=2, maxDuration=60s, maxSize=100MB
+17:25:32.367 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Resolved FFmpeg: 'ffmpeg', FFprobe: 'ffprobe'
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
