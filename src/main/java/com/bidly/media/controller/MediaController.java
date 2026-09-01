@@ -49,6 +49,17 @@ public class MediaController {
     }
 
     /**
+     * GET /api/media/status?url=listings/reels/uuid.mp4 — Check background processing status
+     */
+    @GetMapping("/status")
+    public ResponseEntity<ApiResponse<Map<String, String>>> getMediaStatus(
+            @RequestParam("url") String url) {
+
+        Map<String, String> data = mediaService.getJobStatus(url);
+        return ResponseEntity.ok(ApiResponse.success("Media status retrieved", data));
+    }
+
+    /**
      * GET /api/media/presigned-url?folder=listings/uuid&ext=jpg&contentType=image/jpeg
      */
     @GetMapping("/presigned-url")

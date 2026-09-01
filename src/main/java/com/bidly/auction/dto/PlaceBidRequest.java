@@ -14,6 +14,8 @@ public class PlaceBidRequest {
 
     private UUID deliveryAddressId;
 
+    private String clientBidId;
+
     public PlaceBidRequest() {}
 
     public PlaceBidRequest(BigDecimal amount, UUID deliveryAddressId) {
@@ -21,9 +23,18 @@ public class PlaceBidRequest {
         this.deliveryAddressId = deliveryAddressId;
     }
 
+    public PlaceBidRequest(BigDecimal amount, UUID deliveryAddressId, String clientBidId) {
+        this.amount = amount;
+        this.deliveryAddressId = deliveryAddressId;
+        this.clientBidId = clientBidId;
+    }
+
     public BigDecimal getAmount() { return amount; }
     public void setAmount(BigDecimal amount) { this.amount = amount; }
 
     public UUID getDeliveryAddressId() { return deliveryAddressId; }
     public void setDeliveryAddressId(UUID deliveryAddressId) { this.deliveryAddressId = deliveryAddressId; }
+
+    public String getClientBidId() { return clientBidId; }
+    public void setClientBidId(String clientBidId) { this.clientBidId = clientBidId; }
 }

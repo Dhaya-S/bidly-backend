@@ -56,13 +56,17 @@ public class ListingController {
     }
 
     /**
-     * GET /api/listings/search — Search and filter marketplace products with geospatial search radius
+     * GET /api/listings/search — Search and filter marketplace products with geospatial search radius, price, condition, sort
      */
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<List<ListingSummaryDto>>> searchListings(
             @RequestParam(required = false) String q,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String method,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false) java.math.BigDecimal minPrice,
+            @RequestParam(required = false) java.math.BigDecimal maxPrice,
+            @RequestParam(required = false) String condition,
             @RequestParam(required = false) Double lat,
             @RequestParam(required = false) Double lng,
             @RequestParam(required = false) Integer radiusKm,
@@ -70,7 +74,7 @@ public class ListingController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         List<ListingSummaryDto> results = listingService.searchListings(
-                q, category, method, lat, lng, radiusKm, currentUserId, page, size);
+                q, category, method, sortBy, minPrice, maxPrice, condition, lat, lng, radiusKm, currentUserId, page, size);
         return ResponseEntity.ok(ApiResponse.success(results));
     }
 
@@ -132,6 +136,9 @@ public class ListingController {
         } else if ("unlike".equalsIgnoreCase(action)) {
             desiredLiked = Boolean.FALSE;
         }
+        ListingSummaryDto updated = listingService.toggleLikeListing(id, currentUserId, desiredLiked);
+        return ResponseEntity.ok(ApiResponse.success(updated));
+    }
     /**
      * GET /api/listings/my — List user's active, sold, and draft listings
      */

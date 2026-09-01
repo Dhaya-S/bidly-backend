@@ -15,8 +15,11 @@ import com.bidly.user.repository.UserRepository;
 import com.bidly.wallet.service.WalletService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -37,6 +40,7 @@ public class AuctionService {
     private final WalletService walletService;
     private final MediaService mediaService;
     private final com.bidly.order.service.OrderService orderService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public AuctionService(
             ListingRepository listingRepository,
@@ -45,7 +49,8 @@ public class AuctionService {
             DeliveryAddressRepository addressRepository,
             WalletService walletService,
             MediaService mediaService,
-            com.bidly.order.service.OrderService orderService) {
+            com.bidly.order.service.OrderService orderService,
+            SimpMessagingTemplate messagingTemplate) {
         this.listingRepository = listingRepository;
         this.bidRepository = bidRepository;
         this.userRepository = userRepository;
@@ -53,20 +58,49 @@ public class AuctionService {
         this.walletService = walletService;
         this.mediaService = mediaService;
         this.orderService = orderService;
+        this.messagingTemplate = messagingTemplate;
     }
 
     /**
-     * Concurrency-safe atomic bid placement using pessimistic row locking.
+     * Concurrency-safe atomic bid placement using pessimistic row locking,
+     * wallet reservation, idempotency protection via clientBidId, and post-commit WebSocket broadcast.
      */
     @Transactional
     public BidResponseDto placeBid(UUID listingId, UUID currentUserId, PlaceBidRequest req) {
+        long startTime = System.currentTimeMillis();
+
         if (req == null || req.getAmount() == null) {
             throw BidlyException.badRequest("Bid amount is required");
         }
 
+        // 0. Idempotency Check: if clientBidId already exists, return existing bid idempotently
+        if (req.getClientBidId() != null && !req.getClientBidId().trim().isEmpty()) {
+            Optional<Bid> existingBidOpt = bidRepository.findByClientBidId(req.getClientBidId().trim());
+            if (existingBidOpt.isPresent()) {
+                Bid existing = existingBidOpt.get();
+                log.info("[AUCTION_BID] IDEMPOTENT return existing bid {} for clientBidId {}",
+                        existing.getId(), req.getClientBidId());
+                AuctionDetailsDto details = getAuctionDetails(listingId, currentUserId);
+                int totalBids = (int) bidRepository.countByListingId(listingId);
+                return new BidResponseDto(
+                        existing.getId(),
+                        listingId,
+                        existing.getAmount(),
+                        existing.getAmount(),
+                        totalBids,
+                        true,
+                        existing.getStatus().name(),
+                        "Bid already processed",
+                        details
+                );
+            }
+        }
+
         // 1. Acquire pessimistic write lock on Listing
+        long lockStart = System.currentTimeMillis();
         Listing listing = listingRepository.findByIdWithPessimisticLock(listingId)
                 .orElseThrow(() -> BidlyException.notFound("Auction listing not found: " + listingId));
+        long lockDuration = System.currentTimeMillis() - lockStart;
 
         // 2. Validate selling method
         if (listing.getSellingMethod() != Listing.SellingMethod.AUCTION) {
@@ -81,7 +115,7 @@ public class AuctionService {
         // 4. Validate auction time
         Instant now = Instant.now();
         if (listing.getAuctionEndTime() != null && now.isAfter(listing.getAuctionEndTime())) {
-            throw BidlyException.badRequest("Auction has expired");
+            throw BidlyException.badRequest("AUCTION_ENDED: Auction has expired");
         }
 
         // 5. Validate bidder identity
@@ -119,10 +153,11 @@ public class AuctionService {
         }
 
         // 8. Wallet Funds Reservation with Transaction-Safe Adjustment
-        Optional<Bid> prevUserBidOpt = bidRepository.findFirstByListingIdAndBidderIdOrderByAmountDescCreatedAtDesc(listingId, currentUserId);
+        long walletStart = System.currentTimeMillis();
+        Optional<Bid> prevUserBidOpt = bidRepository.findFirstByListingIdAndBidderIdAndStatusOrderByAmountDescCreatedAtDesc(listingId, currentUserId, Bid.BidStatus.ACTIVE);
         BigDecimal amountToReserve = req.getAmount();
 
-        if (prevUserBidOpt.isPresent() && prevUserBidOpt.get().getStatus() == Bid.BidStatus.ACTIVE) {
+        if (prevUserBidOpt.isPresent()) {
             // User was previously active highest bidder, only reserve the difference
             BigDecimal previousReserved = prevUserBidOpt.get().getAmount();
             BigDecimal diff = req.getAmount().subtract(previousReserved);
@@ -139,12 +174,13 @@ public class AuctionService {
             }
             walletService.reserveFunds(currentUserId, amountToReserve, listingId);
         }
+        long walletDuration = System.currentTimeMillis() - walletStart;
 
         // 9. Release previous highest bidder's reserved funds if it was a different user
-        Optional<Bid> currentHighestBidOpt = bidRepository.findFirstByListingIdOrderByAmountDescCreatedAtDesc(listingId);
+        Optional<Bid> currentHighestBidOpt = bidRepository.findFirstByListingIdAndStatusOrderByAmountDescCreatedAtDesc(listingId, Bid.BidStatus.ACTIVE);
         if (currentHighestBidOpt.isPresent()) {
             Bid previousHighest = currentHighestBidOpt.get();
-            if (!previousHighest.getBidder().getId().equals(currentUserId) && previousHighest.getStatus() == Bid.BidStatus.ACTIVE) {
+            if (!previousHighest.getBidder().getId().equals(currentUserId)) {
                 previousHighest.setStatus(Bid.BidStatus.OUTBID);
                 bidRepository.save(previousHighest);
                 walletService.releaseFunds(
@@ -166,18 +202,35 @@ public class AuctionService {
         }
 
         // 11. Create and persist new Bid
-        Bid newBid = new Bid(listing, bidder, req.getAmount(), deliveryAddress);
+        long bidInsertStart = System.currentTimeMillis();
+        String clientBidId = (req.getClientBidId() != null && !req.getClientBidId().trim().isEmpty())
+                ? req.getClientBidId().trim()
+                : null;
+        Bid newBid = new Bid(listing, bidder, req.getAmount(), deliveryAddress, clientBidId);
         newBid.setStatus(Bid.BidStatus.ACTIVE);
         Bid savedBid = bidRepository.save(newBid);
+        long bidInsertDuration = System.currentTimeMillis() - bidInsertStart;
 
         // 12. Update Listing denormalized cache values atomically
         listing.setCurrentBid(req.getAmount());
-        listing.setViewsCount(listing.getViewsCount()); // preserve views
-        int newBidsCount = (int) bidRepository.countByListingId(listingId);
-        // Note: Listing entity bidsCount property
+        listing.setBidsCount((int) bidRepository.countByListingIdAndStatusNot(listingId, Bid.BidStatus.WITHDRAWN));
         listingRepository.save(listing);
 
-        log.info("Placed bid of ₹{} on listing '{}' by user '{}'", req.getAmount(), listingId, currentUserId);
+        // 13. Register Transaction Synchronization for Post-Commit WebSocket Broadcast
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    broadcastAuctionEvent(listingId, "BID_PLACED");
+                }
+            });
+        } else {
+            broadcastAuctionEvent(listingId, "BID_PLACED");
+        }
+
+        long totalDuration = System.currentTimeMillis() - startTime;
+        log.info("[BID_TIMING] listing={} user={} amount={} lock_ms={} wallet_ms={} insert_ms={} total_ms={}",
+                listingId, currentUserId, req.getAmount(), lockDuration, walletDuration, bidInsertDuration, totalDuration);
 
         AuctionDetailsDto details = getAuctionDetails(listingId, currentUserId);
 
@@ -186,7 +239,7 @@ public class AuctionService {
                 listingId,
                 req.getAmount(),
                 req.getAmount(),
-                newBidsCount,
+                listing.getBidsCount(),
                 true,
                 "ACTIVE",
                 "Bid placed successfully!",
@@ -195,7 +248,39 @@ public class AuctionService {
     }
 
     /**
-     * Get complete auction details matching visual reference.
+     * Broadcasts authoritative real-time event to isolated auction STOMP topic /topic/auctions/{listingId}
+     */
+    public void broadcastAuctionEvent(UUID listingId, String eventType) {
+        try {
+            AuctionDetailsDto details = getAuctionDetails(listingId, null);
+            AuctionEventDto event = new AuctionEventDto(
+                    eventType,
+                    listingId,
+                    details.getCurrentHighestBid(),
+                    details.getHighestBidderId(),
+                    details.getHighestBidderName(),
+                    details.getTotalBids(),
+                    details.getMinNextBid(),
+                    details.getMinBidIncrement(),
+                    details.getAuctionEndTime(),
+                    details.getSecondsRemaining(),
+                    details.getStatus(),
+                    Instant.now(),
+                    details.getRecentBids(),
+                    details.getWatchingCount()
+            );
+
+            String destination = "/topic/auctions/" + listingId;
+            messagingTemplate.convertAndSend(destination, event);
+            log.info("[AUCTION_WS] BROADCAST destination={} eventType={} highestBid={} totalBids={}",
+                    destination, eventType, details.getCurrentHighestBid(), details.getTotalBids());
+        } catch (Exception e) {
+            log.warn("[AUCTION_WS] Failed to broadcast event for listing {}: {}", listingId, e.getMessage());
+        }
+    }
+
+    /**
+     * Get complete auction details matching visual reference with authoritative database data.
      */
     @Transactional(readOnly = true)
     public AuctionDetailsDto getAuctionDetails(UUID listingId, UUID currentUserId) {
@@ -204,7 +289,7 @@ public class AuctionService {
 
         AuctionDetailsDto dto = new AuctionDetailsDto();
         dto.setListingId(listing.getId());
-        dto.setTitle(listing.getTitle());
+        dto.setTitle(listing.getTitle() != null ? listing.getTitle() : "");
         dto.setProductCondition(listing.getCondition() != null ? listing.getCondition().name() : "LIKE_NEW");
 
         String primaryImg = (listing.getMedia() != null && !listing.getMedia().isEmpty())
@@ -225,10 +310,10 @@ public class AuctionService {
         BigDecimal startingBid = listing.getStartingBid() != null ? listing.getStartingBid() : listing.getPrice();
         BigDecimal currentBid = listing.getCurrentBid() != null ? listing.getCurrentBid() : startingBid;
         BigDecimal minIncrement = listing.getBidIncrement() != null ? listing.getBidIncrement() : BigDecimal.valueOf(500.00);
-        BigDecimal minNextBid = currentBid.add(minIncrement);
+        BigDecimal minNextBid = currentBid != null ? currentBid.add(minIncrement) : minIncrement;
 
-        dto.setStartingBid(startingBid);
-        dto.setCurrentHighestBid(currentBid);
+        dto.setStartingBid(startingBid != null ? startingBid : BigDecimal.ZERO);
+        dto.setCurrentHighestBid(currentBid != null ? currentBid : BigDecimal.ZERO);
         dto.setMinNextBid(minNextBid);
         dto.setMinBidIncrement(minIncrement);
         dto.setAuctionEndTime(listing.getAuctionEndTime());
@@ -237,31 +322,31 @@ public class AuctionService {
         long secondsLeft = 0;
         if (listing.getAuctionEndTime() != null) {
             secondsLeft = Math.max(0, Duration.between(now, listing.getAuctionEndTime()).getSeconds());
-        } else {
-            secondsLeft = 7200; // default 2 hours demo
         }
         dto.setSecondsRemaining(secondsLeft);
         dto.setTimeLeftFormatted(formatSecondsToHuman(secondsLeft));
 
-        int totalBids = (int) bidRepository.countByListingId(listingId);
+        int totalBids = (int) bidRepository.countByListingIdAndStatusNot(listingId, Bid.BidStatus.WITHDRAWN);
         dto.setTotalBids(totalBids);
-        dto.setWatchingCount(Math.max(12, (int) (listing.getViewsCount() > 0 ? listing.getViewsCount() : 284)));
+        dto.setWatchingCount((int) listing.getViewsCount());
 
         dto.setStatus(listing.getStatus().name());
         dto.setAuctionEnded(secondsLeft <= 0 || listing.getStatus() != Listing.ListingStatus.ACTIVE);
 
-        // Highest Bidder Info
-        Optional<Bid> highestBidOpt = bidRepository.findFirstByListingIdOrderByAmountDescCreatedAtDesc(listingId);
+        // Highest Bidder Info (Active or Won bid)
+        Optional<Bid> highestBidOpt = bidRepository.findFirstByListingIdAndStatusInOrderByAmountDescCreatedAtDesc(
+                listingId, List.of(Bid.BidStatus.ACTIVE, Bid.BidStatus.WON));
         if (highestBidOpt.isPresent()) {
             Bid topBid = highestBidOpt.get();
             dto.setHighestBidderId(topBid.getBidder().getId());
-            dto.setHighestBidderName(topBid.getBidder().getName() != null ? topBid.getBidder().getName() : "Verified Bidder");
+            dto.setHighestBidderName(topBid.getBidder().getName() != null ? topBid.getBidder().getName() : "");
             dto.setHighestBidderTime(getRelativeTime(topBid.getCreatedAt()));
         }
 
         // Current User Bid Status
         if (currentUserId != null) {
-            Optional<Bid> userTopBidOpt = bidRepository.findFirstByListingIdAndBidderIdOrderByAmountDescCreatedAtDesc(listingId, currentUserId);
+            Optional<Bid> userTopBidOpt = bidRepository.findFirstByListingIdAndBidderIdAndStatusInOrderByAmountDescCreatedAtDesc(
+                    listingId, currentUserId, List.of(Bid.BidStatus.ACTIVE, Bid.BidStatus.OUTBID, Bid.BidStatus.WON));
             if (userTopBidOpt.isPresent()) {
                 Bid userBid = userTopBidOpt.get();
                 dto.setCurrentUserBid(userBid.getAmount());
@@ -283,26 +368,27 @@ public class AuctionService {
         // Win Probability / Competitive Strength Metric based on bid level
         dto.setWinProbability(calculateCompetitiveScore(startingBid, currentBid, minNextBid));
 
-        // Seller Details
+        // Seller Details (Real queries, no fake numbers)
         if (listing.getSeller() != null) {
             User seller = listing.getSeller();
             dto.setSellerId(seller.getId());
-            dto.setSellerName(seller.getName() != null ? seller.getName() : "Verified Seller");
-            dto.setSellerRating(listing.getRating() != null ? listing.getRating() : 4.9);
-            dto.setSellerReviewsCount(312);
-            dto.setSellerSalesCount(48);
+            dto.setSellerName(seller.getName() != null ? seller.getName() : "");
+            dto.setSellerRating(listing.getRating() != null ? listing.getRating() : 0.0);
+            dto.setSellerReviewsCount(0);
+            dto.setSellerSalesCount((int) listingRepository.countBySellerIdAndStatus(seller.getId(), Listing.ListingStatus.SOLD));
         }
-        dto.setCity(listing.getCity() != null ? listing.getCity() : "Chennai");
-        dto.setState(listing.getState() != null ? listing.getState() : "Tamil Nadu");
+        dto.setCity(listing.getCity() != null ? listing.getCity() : "");
+        dto.setState(listing.getState() != null ? listing.getState() : "");
+        dto.setServerTimestamp(Instant.now());
 
-        // Bid History (Top 20 bids)
-        List<Bid> bids = bidRepository.findByListingIdOrderByAmountDescCreatedAtDesc(listingId);
+        // Bid History (Top 20 non-withdrawn bids, deterministic ordering)
+        List<Bid> bids = bidRepository.findByListingIdAndStatusNotOrderByAmountDescCreatedAtDesc(listingId, Bid.BidStatus.WITHDRAWN);
         List<BidHistoryItemDto> historyItems = new ArrayList<>();
         for (int i = 0; i < Math.min(bids.size(), 20); i++) {
             Bid b = bids.get(i);
             String name = b.getBidder().getName() != null ? b.getBidder().getName() : "Bidder " + (i + 1);
             String initials = getInitials(name);
-            boolean isTop = i == 0;
+            boolean isTop = i == 0 && b.getStatus() == Bid.BidStatus.ACTIVE;
             boolean isUser = currentUserId != null && b.getBidder().getId().equals(currentUserId);
 
             historyItems.add(new BidHistoryItemDto(
@@ -323,7 +409,7 @@ public class AuctionService {
     }
 
     /**
-     * Lightweight Live Status for 2.5s polling without reloading entire screen.
+     * Lightweight Live Status for initial sync or fallback without reloading entire screen.
      */
     @Transactional(readOnly = true)
     public AuctionLiveStatusDto getLiveStatus(UUID listingId, UUID currentUserId) {
@@ -337,10 +423,10 @@ public class AuctionService {
         BigDecimal currentBid = listing.getCurrentBid() != null ? listing.getCurrentBid() : startingBid;
         BigDecimal minIncrement = listing.getBidIncrement() != null ? listing.getBidIncrement() : BigDecimal.valueOf(500.00);
 
-        dto.setCurrentHighestBid(currentBid);
-        dto.setMinNextBid(currentBid.add(minIncrement));
-        dto.setTotalBids((int) bidRepository.countByListingId(listingId));
-        dto.setWatchingCount(Math.max(12, (int) (listing.getViewsCount() > 0 ? listing.getViewsCount() : 284)));
+        dto.setCurrentHighestBid(currentBid != null ? currentBid : BigDecimal.ZERO);
+        dto.setMinNextBid(currentBid != null ? currentBid.add(minIncrement) : minIncrement);
+        dto.setTotalBids((int) bidRepository.countByListingIdAndStatusNot(listingId, Bid.BidStatus.WITHDRAWN));
+        dto.setWatchingCount((int) listing.getViewsCount());
 
         Instant now = Instant.now();
         long secondsLeft = 0;
@@ -351,23 +437,26 @@ public class AuctionService {
         dto.setTimeLeftFormatted(formatSecondsToHuman(secondsLeft));
         dto.setStatus(listing.getStatus().name());
         dto.setAuctionEnded(secondsLeft <= 0 || listing.getStatus() != Listing.ListingStatus.ACTIVE);
+        dto.setServerTimestamp(Instant.now());
 
-        Optional<Bid> highestBidOpt = bidRepository.findFirstByListingIdOrderByAmountDescCreatedAtDesc(listingId);
+        Optional<Bid> highestBidOpt = bidRepository.findFirstByListingIdAndStatusInOrderByAmountDescCreatedAtDesc(
+                listingId, List.of(Bid.BidStatus.ACTIVE, Bid.BidStatus.WON));
         if (highestBidOpt.isPresent()) {
             Bid topBid = highestBidOpt.get();
             dto.setHighestBidderId(topBid.getBidder().getId());
-            dto.setHighestBidderName(topBid.getBidder().getName() != null ? topBid.getBidder().getName() : "Verified Bidder");
+            dto.setHighestBidderName(topBid.getBidder().getName() != null ? topBid.getBidder().getName() : "");
         }
 
         if (currentUserId != null) {
-            Optional<Bid> userTopBidOpt = bidRepository.findFirstByListingIdAndBidderIdOrderByAmountDescCreatedAtDesc(listingId, currentUserId);
+            Optional<Bid> userTopBidOpt = bidRepository.findFirstByListingIdAndBidderIdAndStatusInOrderByAmountDescCreatedAtDesc(
+                    listingId, currentUserId, List.of(Bid.BidStatus.ACTIVE, Bid.BidStatus.OUTBID, Bid.BidStatus.WON));
             if (userTopBidOpt.isPresent()) {
                 Bid userBid = userTopBidOpt.get();
                 dto.setCurrentUserBid(userBid.getAmount());
 
                 boolean isWinning = highestBidOpt.isPresent() && highestBidOpt.get().getBidder().getId().equals(currentUserId);
                 dto.setCurrentUserWinning(isWinning);
-                dto.setCurrentUserOutbid(!isWinning && currentBid.compareTo(userBid.getAmount()) > 0);
+                dto.setCurrentUserOutbid(!isWinning && currentBid != null && currentBid.compareTo(userBid.getAmount()) > 0);
 
                 if (dto.isCurrentUserOutbid()) {
                     dto.setBehindByAmount(currentBid.subtract(userBid.getAmount()));
@@ -379,7 +468,7 @@ public class AuctionService {
         }
 
         // Live Feed (Top 5 items)
-        List<Bid> bids = bidRepository.findByListingIdOrderByAmountDescCreatedAtDesc(listingId);
+        List<Bid> bids = bidRepository.findByListingIdAndStatusNotOrderByAmountDescCreatedAtDesc(listingId, Bid.BidStatus.WITHDRAWN);
         List<BidHistoryItemDto> feed = new ArrayList<>();
         for (int i = 0; i < Math.min(bids.size(), 5); i++) {
             Bid b = bids.get(i);
@@ -392,7 +481,7 @@ public class AuctionService {
                     b.getAmount(),
                     b.getCreatedAt(),
                     getRelativeTime(b.getCreatedAt()),
-                    i == 0,
+                    i == 0 && b.getStatus() == Bid.BidStatus.ACTIVE,
                     currentUserId != null && b.getBidder().getId().equals(currentUserId)
             ));
         }
@@ -402,7 +491,7 @@ public class AuctionService {
     }
 
     /**
-     * Safely withdraws user's active bid and releases reserved funds.
+     * Safely withdraws user's active bid, releases reserved funds, promotes next highest valid bidder, and broadcasts BID_WITHDRAWN event.
      */
     @Transactional
     public void withdrawBid(UUID listingId, UUID currentUserId) {
@@ -413,8 +502,9 @@ public class AuctionService {
             throw BidlyException.badRequest("Cannot withdraw from an inactive or ended auction");
         }
 
-        Optional<Bid> userBidOpt = bidRepository.findFirstByListingIdAndBidderIdOrderByAmountDescCreatedAtDesc(listingId, currentUserId);
-        if (userBidOpt.isEmpty() || userBidOpt.get().getStatus() != Bid.BidStatus.ACTIVE) {
+        Optional<Bid> userBidOpt = bidRepository.findFirstByListingIdAndBidderIdAndStatusOrderByAmountDescCreatedAtDesc(
+                listingId, currentUserId, Bid.BidStatus.ACTIVE);
+        if (userBidOpt.isEmpty()) {
             throw BidlyException.badRequest("You do not have an active bid to withdraw on this auction");
         }
 
@@ -429,16 +519,51 @@ public class AuctionService {
                 "Withdrew bid from listing: " + listing.getTitle()
         );
 
-        // Re-evaluate current highest bid
-        Optional<Bid> nextHighestOpt = bidRepository.findFirstByListingIdOrderByAmountDescCreatedAtDesc(listingId);
-        if (nextHighestOpt.isPresent() && nextHighestOpt.get().getStatus() == Bid.BidStatus.ACTIVE) {
-            listing.setCurrentBid(nextHighestOpt.get().getAmount());
-        } else {
-            listing.setCurrentBid(listing.getStartingBid());
+        // Re-evaluate next highest eligible bid among remaining non-withdrawn bids
+        List<Bid> remainingBids = bidRepository.findByListingIdAndStatusNotOrderByAmountDescCreatedAtDesc(
+                listingId, Bid.BidStatus.WITHDRAWN);
+
+        boolean foundNewHighest = false;
+        for (Bid candidate : remainingBids) {
+            if (candidate.getStatus() == Bid.BidStatus.ACTIVE) {
+                listing.setCurrentBid(candidate.getAmount());
+                foundNewHighest = true;
+                break;
+            } else if (candidate.getStatus() == Bid.BidStatus.OUTBID) {
+                // Restore previous bidder if they have available wallet funds
+                if (walletService.validateAvailableFunds(candidate.getBidder().getId(), candidate.getAmount())) {
+                    walletService.reserveFunds(candidate.getBidder().getId(), candidate.getAmount(), listingId);
+                    candidate.setStatus(Bid.BidStatus.ACTIVE);
+                    bidRepository.save(candidate);
+                    listing.setCurrentBid(candidate.getAmount());
+                    foundNewHighest = true;
+                    log.info("[AUCTION_WITHDRAW] Restored bidder {} (amount: ₹{}) as new highest bidder",
+                            candidate.getBidder().getId(), candidate.getAmount());
+                    break;
+                }
+            }
         }
+
+        if (!foundNewHighest) {
+            BigDecimal startingBid = listing.getStartingBid() != null ? listing.getStartingBid() : listing.getPrice();
+            listing.setCurrentBid(startingBid);
+        }
+
+        listing.setBidsCount((int) bidRepository.countByListingIdAndStatusNot(listingId, Bid.BidStatus.WITHDRAWN));
         listingRepository.save(listing);
 
-        log.info("User '{}' withdrew bid from listing '{}'", currentUserId, listingId);
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    broadcastAuctionEvent(listingId, "BID_WITHDRAWN");
+                }
+            });
+        } else {
+            broadcastAuctionEvent(listingId, "BID_WITHDRAWN");
+        }
+
+        log.info("User '{}' withdrew bid from listing '{}', new highest bid: ₹{}", currentUserId, listingId, listing.getCurrentBid());
     }
 
     private int calculateCompetitiveScore(BigDecimal starting, BigDecimal current, BigDecimal nextBid) {
@@ -486,9 +611,10 @@ public class AuctionService {
     }
 
     /**
-     * Finalizes a single auction by selecting the top valid bid,
+     * Finalizes a single auction by selecting the top valid active bid,
      * converting reserved funds to escrow, creating the winning order,
-     * and marking the listing as SOLD or EXPIRED.
+     * releasing any remaining active losing bids,
+     * marking the listing as SOLD or EXPIRED, and broadcasting AUCTION_ENDED.
      */
     @Transactional
     public void finalizeSingleAuction(UUID listingId) {
@@ -507,18 +633,24 @@ public class AuctionService {
             return;
         }
 
-        Optional<Bid> winningBidOpt = bidRepository.findFirstByListingIdOrderByAmountDescCreatedAtDesc(listingId);
+        Optional<Bid> winningBidOpt = bidRepository.findFirstByListingIdAndStatusOrderByAmountDescCreatedAtDesc(listingId, Bid.BidStatus.ACTIVE);
         if (winningBidOpt.isPresent()) {
             Bid winningBid = winningBidOpt.get();
             winningBid.setStatus(Bid.BidStatus.WON);
             bidRepository.save(winningBid);
 
-            // Mark other active bids as LOST / OUTBID
-            List<Bid> allBids = bidRepository.findByListingIdOrderByAmountDescCreatedAtDesc(listingId);
-            for (Bid b : allBids) {
-                if (!b.getId().equals(winningBid.getId()) && b.getStatus() == Bid.BidStatus.ACTIVE) {
+            // Release any other active bids as OUTBID
+            List<Bid> activeBids = bidRepository.findByListingIdAndStatus(listingId, Bid.BidStatus.ACTIVE);
+            for (Bid b : activeBids) {
+                if (!b.getId().equals(winningBid.getId())) {
                     b.setStatus(Bid.BidStatus.OUTBID);
                     bidRepository.save(b);
+                    walletService.releaseFunds(
+                            b.getBidder().getId(),
+                            b.getAmount(),
+                            listingId,
+                            "Auction ended: Outbid by winner"
+                    );
                 }
             }
 
@@ -529,10 +661,21 @@ public class AuctionService {
             orderService.createOrderForWinningBid(listing, winningBid);
             log.info("Auction '{}' finalized. Winner: '{}', Amount: Rs.{}", listing.getTitle(), winningBid.getBidder().getName(), winningBid.getAmount());
         } else {
-            // No bids placed
+            // No valid active bids placed
             listing.setStatus(Listing.ListingStatus.EXPIRED);
             listingRepository.save(listing);
             log.info("Auction '{}' expired with 0 bids. Marked EXPIRED.", listing.getTitle());
+        }
+
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    broadcastAuctionEvent(listingId, "AUCTION_ENDED");
+                }
+            });
+        } else {
+            broadcastAuctionEvent(listingId, "AUCTION_ENDED");
         }
     }
 

@@ -15,13 +15,13 @@ import java.util.UUID;
 @Repository
 public interface CommunityPostRepository extends JpaRepository<CommunityPost, UUID> {
 
-    @EntityGraph(attributePaths = {"author", "community", "listing", "listing.media"})
+    @EntityGraph(attributePaths = {"author", "community", "listing"})
     Page<CommunityPost> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
-    @EntityGraph(attributePaths = {"author", "community", "listing", "listing.media"})
+    @EntityGraph(attributePaths = {"author", "community", "listing"})
     Page<CommunityPost> findByCommunityIsNullOrderByCreatedAtDesc(Pageable pageable);
 
-    @EntityGraph(attributePaths = {"author", "community", "listing", "listing.media"})
+    @EntityGraph(attributePaths = {"author", "community", "listing"})
     Page<CommunityPost> findByCommunityIdOrderByCreatedAtDesc(UUID communityId, Pageable pageable);
 
     @Modifying

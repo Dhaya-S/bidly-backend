@@ -13,35 +13,73 @@ public class ChatRoomDto {
     private String buyerName;
     private UUID sellerId;
     private String sellerName;
+    private UUID otherUserId;
+    private String otherUserName;
+    private String otherUserRole; // 'Buyer' or 'Seller'
     private String status;
+    private int unreadCount;
     private Instant lastMessageAt;
     private Instant createdAt;
     private String lastMessagePreview;
+    private boolean isOnline;
+    private Instant lastSeen;
+
+    public ChatRoomDto() {}
 
     public UUID getId()                            { return id; }
     public void setId(UUID id)                     { this.id = id; }
+
     public UUID getListingId()                     { return listingId; }
     public void setListingId(UUID v)               { this.listingId = v; }
+
     public String getListingTitle()                { return listingTitle; }
     public void setListingTitle(String v)          { this.listingTitle = v; }
+
     public String getListingImageUrl()             { return listingImageUrl; }
     public void setListingImageUrl(String v)       { this.listingImageUrl = v; }
+
     public double getListingPrice()                { return listingPrice; }
     public void setListingPrice(double v)          { this.listingPrice = v; }
+
     public UUID getBuyerId()                       { return buyerId; }
     public void setBuyerId(UUID v)                 { this.buyerId = v; }
+
     public String getBuyerName()                   { return buyerName; }
     public void setBuyerName(String v)             { this.buyerName = v; }
+
     public UUID getSellerId()                      { return sellerId; }
     public void setSellerId(UUID v)                { this.sellerId = v; }
+
     public String getSellerName()                  { return sellerName; }
     public void setSellerName(String v)            { this.sellerName = v; }
+
+    public UUID getOtherUserId()                   { return otherUserId; }
+    public void setOtherUserId(UUID v)             { this.otherUserId = v; }
+
+    public String getOtherUserName()               { return otherUserName; }
+    public void setOtherUserName(String v)         { this.otherUserName = v; }
+
+    public String getOtherUserRole()               { return otherUserRole; }
+    public void setOtherUserRole(String v)         { this.otherUserRole = v; }
+
     public String getStatus()                      { return status; }
     public void setStatus(String v)                { this.status = v; }
+
+    public int getUnreadCount()                    { return unreadCount; }
+    public void setUnreadCount(int v)              { this.unreadCount = v; }
+
     public Instant getLastMessageAt()              { return lastMessageAt; }
     public void setLastMessageAt(Instant v)        { this.lastMessageAt = v; }
+
     public Instant getCreatedAt()                  { return createdAt; }
     public void setCreatedAt(Instant v)            { this.createdAt = v; }
+
     public String getLastMessagePreview()          { return lastMessagePreview; }
     public void setLastMessagePreview(String v)    { this.lastMessagePreview = v; }
+
+    public boolean isOnline()                      { return isOnline; }
+    public void setOnline(boolean v)               { this.isOnline = v; }
+
+    public Instant getLastSeen()                   { return lastSeen; }
+    public void setLastSeen(Instant v)             { this.lastSeen = v; }
 }

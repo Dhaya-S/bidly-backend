@@ -1,75 +1,5 @@
-K>>> SUCCESS: V10 Community Migrations and Flyway repaired on Neon DB! <<<
-#=== NEON DB: LISTINGS & MEDIA ===
-,Updated rfgg seller to Dhaya successfully!
-*=== CLEANING DUMMY DATA FROM NEON DB ===
- Deleted dummy listing media: 0
-Deleted dummy listings: 0
-$Deleted dummy community members: 0
-Deleted dummy communities: 4
-
-!=== REMAINING LIVE LISTINGS ===
-MListing: 7473920e-77b4-4583-9476-f37898e479f2 | tvtvtv | ?6988.00 | Chennai
-MListing: 105ff332-3b43-4551-bb66-6fc2c5e81225 | gugiug | ?6399.00 | Chennai
-IListing: 96895748-21b8-473a-b48f-b1ebb429c920 | fff | ?555.00 | Chennai
-HListing: 83d9de1f-1368-41d2-96f5-cc587391c7d4 | ttt | ?89.00 | Chennai
-AListing: d2e6de93-bf3e-431e-9cff-8458ae845b29 | jj9 | ?99.00 | 
-KListing: c7f8fe87-739d-4370-b93e-b4c44ace9cd6 | rfgg | ?8558.00 | Chennai
-DListing: b067cfc1-18c1-4e3f-877b-b3cad25032d2 | ghjj | ?5585.00 | 
-KListing: e4666d44-8b97-4251-b80b-940ef0774781 | ppppp | ?996.00 | Chennai
-BListing: f89464ce-d9d5-404d-9909-e2be946cc869 | y2y2 | ?66.00 | 
-FListing: 0b3b1eb8-350b-40d0-bb58-e7436eef45ba | ufugyf | ?8665.00 | 
-FListing: 06a0a01a-e6ef-4145-99ae-a13b1075af64 | hfyfyf | ?8665.00 | 
-hListing: e224d1a1-f734-4695-877c-da73dc87b5cb | Phase 3.7 Optimized Camera Drone | ?78000.00 | Chennai
-NListing: 35179162-5e21-41e9-917a-e8c623ffaeb1 | ooooo | ?595959.00 | Chennai
-nListing: c136640f-0c8f-4a67-a362-af0ac94baea6 | Apple iPhone 15 Pro Max (Demo Auction) | ?30000.00 | Chennai
-hListing: 4cb1917b-8bd9-4219-a38b-0fa53e86f52b | Phase 3.5 Test Multi-Media Drone | ?45000.00 | Chennai
-hListing: 9738839b-b49e-403b-9ecc-54740a7179ec | Phase 3.5 Test Multi-Media Drone | ?45000.00 | Chennai
-_Listing: caa164cc-3229-46d3-bb3d-fda10ed0649b | DJI Mini 4 Pro 4K Drone | ?68000.00 | Chennai
-dListing: eb64577c-89a0-4e5b-a9ca-82177d2aff9b | Vintage Hasselblad 500C/M | ?125000.00 | Bangalore
-_Listing: 7b724aee-cb6f-4b20-a3ec-6fa66952f742 | DJI Mini 4 Pro 4K Drone | ?68000.00 | Chennai
-dListing: dae64972-0f24-4884-817e-3211f79bf521 | Vintage Hasselblad 500C/M | ?125000.00 | Bangalore
-nListing: 12e9d932-8936-4c0f-a029-be83f62be9ac | Apple iPhone 15 Pro Max (Demo Auction) | ?30000.00 | Chennai
-nListing: e752c46f-36fd-4589-a8e7-1409b0d3da5c | Apple iPhone 15 Pro Max (Demo Auction) | ?30000.00 | Chennai
-hListing: 37d508a0-5f2c-431d-a568-9adf8a1a7844 | Phase 3.5 Test Multi-Media Drone | ?45000.00 | Chennai
-fListing: 780b5818-8068-4c16-ad10-cc8cf649ee35 | Phase 3.6 4K Camera Drone Reel | ?62000.00 | Chennai
-fListing: 1b10bd0f-9069-4ad5-9b82-16b66c11d9b9 | Phase 3.6 4K Camera Drone Reel | ?62000.00 | Chennai
-fListing: 8e770b8e-1b6e-46dc-b345-558e2b0bd8b5 | Phase 3.6 4K Camera Drone Reel | ?62000.00 | Chennai
-
-$=== REMAINING LIVE COMMUNITIES ===
-QCommunity: 9a19dd9c-ccf1-4f66-b3f8-bc669e5f00c3 | ggggf | Electronics | Chennai
-NCommunity: 092769de-721c-4bad-ba25-4afae36dd9f6 | jjjj | Furniture | Chennai
-QCommunity: c5da35cf-81a4-4521-8eaf-d3ec0282f6fd | dhaya | Electronics | Chennai
-OCommunity: 1be05e22-fb00-4f1a-885b-cdeb9dbe4573 | yrv | Electronics | Chennai
-0Deleted 0 dummy seed communities from Neon DB.
-vRemaining Community: 9a19dd9c-ccf1-4f66-b3f8-bc669e5f00c3 | ggggf | created_by: c0d02ec2-54d4-43a0-9204-89da3bcc09ac
-uRemaining Community: 092769de-721c-4bad-ba25-4afae36dd9f6 | jjjj | created_by: cd9cb12e-ce5a-4968-a3d3-a19ff2e2288e
-vRemaining Community: c5da35cf-81a4-4521-8eaf-d3ec0282f6fd | dhaya | created_by: c6f162d0-8914-4c40-b5c0-aa780ee63ee3
-tRemaining Community: 1be05e22-fb00-4f1a-885b-cdeb9dbe4573 | yrv | created_by: c0d02ec2-54d4-43a0-9204-89da3bcc09ac
-
-	ñStandard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
-
-	&Testing putObject with PATH style...
-
-	;>>> SUCCESS (Path Style): Uploaded file to Cloudflare R2!
-®17:25:30.652 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Initialized with maxConcurrentJobs=2, maxDuration=60s, maxSize=100MB
-ë17:25:30.656 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Resolved FFmpeg: 'ffmpeg', FFprobe: 'ffprobe'
-®17:25:30.776 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Initialized with maxConcurrentJobs=2, maxDuration=60s, maxSize=100MB
-ë17:25:30.776 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Resolved FFmpeg: 'ffmpeg', FFprobe: 'ffprobe'
-®17:25:30.902 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Initialized with maxConcurrentJobs=2, maxDuration=60s, maxSize=100MB
-ë17:25:30.903 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Resolved FFmpeg: 'ffmpeg', FFprobe: 'ffprobe'
-®17:25:31.069 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Initialized with maxConcurrentJobs=2, maxDuration=60s, maxSize=100MB
-ë17:25:31.070 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Resolved FFmpeg: 'ffmpeg', FFprobe: 'ffprobe'
-´17:25:31.457 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] START file=source_073eb11d-dd80-4911-b28d-97ea2caf26de.mp4 size=12.8 KB
-≤17:25:31.561 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] INPUT resolution=320x240 duration=2.00s vCodec=h264 aCodec=none bitrate=52kbps
-°17:25:31.561 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] OUTPUT resolution=320x240 (Aspect ratio preserved, max 1080p)
-17:25:31.561 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] FFMPEG START transcoding...
-ê17:25:31.801 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] FFMPEG COMPLETE in 239ms, outputSize=13.5 KB
-é17:25:31.802 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] THUMBNAIL START generating poster frame...
-á17:25:31.931 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] THUMBNAIL COMPLETE thumbSize=8.9 KB
-Å17:25:31.932 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] FAST_START verification: PASS
-®17:25:32.090 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Initialized with maxConcurrentJobs=2, maxDuration=60s, maxSize=100MB
-ë17:25:32.091 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Resolved FFmpeg: 'ffmpeg', FFprobe: 'ffprobe'
-®17:25:32.222 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Initialized with maxConcurrentJobs=2, maxDuration=60s, maxSize=100MB
-ë17:25:32.223 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Resolved FFmpeg: 'ffmpeg', FFprobe: 'ffprobe'
-®17:25:32.366 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Initialized with maxConcurrentJobs=2, maxDuration=60s, maxSize=100MB
-ë17:25:32.367 [Test worker] INFO com.bidly.media.service.VideoProcessingService -- [VIDEO_PROCESS] Resolved FFmpeg: 'ffmpeg', FFprobe: 'ffprobe'
+º17:22:22.493 [Test worker] INFO com.bidly.chat.service.ChatService -- [CHAT_IDEMPOTENT] Returning existing message 7757ab2f-8bdb-400b-b6a7-0466630f088c for clientMessageId uuid-msg-dup-1
+Ê17:22:22.528 [Test worker] INFO com.bidly.chat.service.ChatService -- [CHAT_WS] BROADCAST message roomId=6a66de14-4e69-46fa-9439-5f98b7257a77 msgId=953c3c1f-3d22-4cba-8ec9-d7658a5d438d sender=998a34a6-82cd-4be6-887d-c45b47a743a7
+†17:22:22.553 [Test worker] INFO com.bidly.offer.service.OfferService -- Counter offer of Rs. 42000.0 submitted on offer '6ac9f0d6-3cf7-456c-8cff-cfba3eb60453'
+ 17:22:22.572 [Test worker] INFO com.bidly.offer.service.OfferService -- Offer '5504911d-86aa-437a-86db-139d6ea524fc' accepted. Listing 'iPhone 13 Pro 256GB' marked SOLD. Order 'ORD-2026-9999' created.
+	ù17:22:22.633 [Test worker] INFO com.bidly.offer.service.OfferService -- Offer of Rs. 42000.0 submitted for listing 'iPhone 13 Pro 256GB' by buyer 'Rahul V'

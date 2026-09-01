@@ -1,5 +1,7 @@
 package com.bidly.offer.service;
 
+import com.bidly.chat.dto.ChatEventDto;
+import com.bidly.chat.dto.ChatMessageDto;
 import com.bidly.chat.entity.ChatMessage;
 import com.bidly.chat.entity.ChatRoom;
 import com.bidly.chat.repository.ChatMessageRepository;
@@ -17,8 +19,11 @@ import com.bidly.user.entity.User;
 import com.bidly.user.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -38,6 +43,7 @@ public class OfferService {
     private final ChatRoomRepository chatRoomRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final MediaService mediaService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public OfferService(
             OfferRepository offerRepository,
@@ -46,7 +52,8 @@ public class OfferService {
             OrderService orderService,
             ChatRoomRepository chatRoomRepository,
             ChatMessageRepository chatMessageRepository,
-            MediaService mediaService) {
+            MediaService mediaService,
+            SimpMessagingTemplate messagingTemplate) {
         this.offerRepository = offerRepository;
         this.listingRepository = listingRepository;
         this.userRepository = userRepository;
@@ -54,6 +61,7 @@ public class OfferService {
         this.chatRoomRepository = chatRoomRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.mediaService = mediaService;
+        this.messagingTemplate = messagingTemplate;
     }
 
     /**
@@ -106,12 +114,17 @@ public class OfferService {
         msg.setSenderId(buyerId);
         msg.setType(ChatMessage.MessageType.OFFER);
         msg.setOfferAmount(req.getAmount());
+        msg.setStatus(ChatMessage.MessageStatus.SENT);
         msg.setContent(req.getMessage() != null && !req.getMessage().isBlank()
                 ? req.getMessage().trim()
-                : "Submitted an offer of Rs. " + req.getAmount().toBigInteger());
-        chatMessageRepository.save(msg);
+                : "Submitted an offer of ₹" + req.getAmount().toBigInteger());
+        ChatMessage savedMsg = chatMessageRepository.save(msg);
         room.setLastMessageAt(Instant.now());
+        room.setUpdatedAt(Instant.now());
         chatRoomRepository.save(room);
+
+        // Broadcast to WebSocket after commit
+        broadcastOfferEvent(room.getId(), saved.getId(), "PENDING", req.getAmount().doubleValue(), null, savedMsg, buyer.getName());
 
         log.info("Offer of Rs. {} submitted for listing '{}' by buyer '{}'", req.getAmount(), listing.getTitle(), buyer.getName());
         return mapToDto(saved, buyerId);
@@ -153,12 +166,17 @@ public class OfferService {
             ChatMessage msg = new ChatMessage();
             msg.setRoomId(room.getId());
             msg.setSenderId(currentUserId);
-            msg.setType(ChatMessage.MessageType.OFFER);
+            msg.setType(ChatMessage.MessageType.OFFER_COUNTERED);
             msg.setOfferAmount(req.getCounterAmount());
-            msg.setContent("Counter offer of Rs. " + req.getCounterAmount().toBigInteger() + (req.getMessage() != null ? ": " + req.getMessage() : ""));
-            chatMessageRepository.save(msg);
+            msg.setStatus(ChatMessage.MessageStatus.SENT);
+            msg.setContent("Counter offer of ₹" + req.getCounterAmount().toBigInteger() + (req.getMessage() != null ? ": " + req.getMessage() : ""));
+            ChatMessage savedMsg = chatMessageRepository.save(msg);
             room.setLastMessageAt(Instant.now());
+            room.setUpdatedAt(Instant.now());
             chatRoomRepository.save(room);
+
+            String senderName = userRepository.findById(currentUserId).map(User::getName).orElse("User");
+            broadcastOfferEvent(room.getId(), saved.getId(), "COUNTERED", offer.getAmount().doubleValue(), req.getCounterAmount().doubleValue(), savedMsg, senderName);
         }
 
         log.info("Counter offer of Rs. {} submitted on offer '{}'", req.getCounterAmount(), offerId);
@@ -187,11 +205,16 @@ public class OfferService {
             ChatMessage msg = new ChatMessage();
             msg.setRoomId(room.getId());
             msg.setSenderId(currentUserId);
-            msg.setType(ChatMessage.MessageType.TEXT);
-            msg.setContent(isSeller ? "Offer of Rs. " + offer.getAmount() + " declined." : "Offer cancelled by buyer.");
-            chatMessageRepository.save(msg);
+            msg.setType(isSeller ? ChatMessage.MessageType.OFFER_REJECTED : ChatMessage.MessageType.SYSTEM);
+            msg.setStatus(ChatMessage.MessageStatus.SENT);
+            msg.setContent(isSeller ? "Offer of ₹" + offer.getAmount() + " declined." : "Offer cancelled by buyer.");
+            ChatMessage savedMsg = chatMessageRepository.save(msg);
             room.setLastMessageAt(Instant.now());
+            room.setUpdatedAt(Instant.now());
             chatRoomRepository.save(room);
+
+            String senderName = userRepository.findById(currentUserId).map(User::getName).orElse("User");
+            broadcastOfferEvent(room.getId(), saved.getId(), saved.getStatus().name(), offer.getAmount().doubleValue(), null, savedMsg, senderName);
         }
 
         return mapToDto(saved, currentUserId);
@@ -253,17 +276,53 @@ public class OfferService {
             ChatMessage msg = new ChatMessage();
             msg.setRoomId(room.getId());
             msg.setSenderId(currentUserId);
-            msg.setType(ChatMessage.MessageType.TEXT);
-            msg.setContent("🎉 Offer of Rs. " + (offer.getCounterAmount() != null ? offer.getCounterAmount() : offer.getAmount()) + " ACCEPTED! Order #" + order.getOrderNumber() + " created.");
-            chatMessageRepository.save(msg);
+            msg.setType(ChatMessage.MessageType.OFFER_ACCEPTED);
+            msg.setStatus(ChatMessage.MessageStatus.SENT);
+            msg.setContent("🎉 Offer of ₹" + (offer.getCounterAmount() != null ? offer.getCounterAmount() : offer.getAmount()) + " ACCEPTED! Order #" + order.getOrderNumber() + " created.");
+            ChatMessage savedMsg = chatMessageRepository.save(msg);
             room.setLastMessageAt(Instant.now());
+            room.setUpdatedAt(Instant.now());
             chatRoomRepository.save(room);
+
+            String senderName = userRepository.findById(currentUserId).map(User::getName).orElse("User");
+            broadcastOfferEvent(room.getId(), savedOffer.getId(), "ACCEPTED", offer.getAmount().doubleValue(), null, savedMsg, senderName);
         }
 
         log.info("Offer '{}' accepted. Listing '{}' marked SOLD. Order '{}' created.", offerId, listing.getTitle(), order.getOrderNumber());
         OfferDto dto = mapToDto(savedOffer, currentUserId);
         dto.setOrderId(order.getId());
         return dto;
+    }
+
+    private void broadcastOfferEvent(UUID roomId, UUID offerId, String status, Double amount, Double counterAmount, ChatMessage msg, String senderName) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    try {
+                        ChatEventDto event = ChatEventDto.offerUpdated(roomId, offerId, status, amount, counterAmount);
+                        messagingTemplate.convertAndSend("/topic/chats/" + roomId, event);
+
+                        ChatMessageDto msgDto = new ChatMessageDto();
+                        msgDto.setId(msg.getId());
+                        msgDto.setRoomId(roomId);
+                        msgDto.setSenderId(msg.getSenderId());
+                        msgDto.setSenderName(senderName);
+                        msgDto.setContent(msg.getContent());
+                        msgDto.setOfferAmount(msg.getOfferAmount());
+                        msgDto.setType(msg.getType().name());
+                        msgDto.setStatus(msg.getStatus().name());
+                        msgDto.setCreatedAt(msg.getCreatedAt());
+
+                        ChatEventDto newMsgEvent = ChatEventDto.newMessage(roomId, msgDto);
+                        messagingTemplate.convertAndSend("/topic/chats/" + roomId, newMsgEvent);
+                        log.info("[OFFER_WS] BROADCAST offerUpdated roomId={} offerId={} status={}", roomId, offerId, status);
+                    } catch (Exception e) {
+                        log.warn("[OFFER_WS] Failed to broadcast offer event: {}", e.getMessage());
+                    }
+                }
+            });
+        }
     }
 
     /**

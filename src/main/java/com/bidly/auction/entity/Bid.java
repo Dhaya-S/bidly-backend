@@ -32,6 +32,9 @@ public class Bid extends BaseEntity {
     @JoinColumn(name = "delivery_address_id")
     private DeliveryAddress deliveryAddress;
 
+    @Column(name = "client_bid_id", length = 64, unique = true)
+    private String clientBidId;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private BidStatus status = BidStatus.ACTIVE;
@@ -50,6 +53,15 @@ public class Bid extends BaseEntity {
         this.status = BidStatus.ACTIVE;
     }
 
+    public Bid(Listing listing, User bidder, BigDecimal amount, DeliveryAddress deliveryAddress, String clientBidId) {
+        this.listing = listing;
+        this.bidder = bidder;
+        this.amount = amount;
+        this.deliveryAddress = deliveryAddress;
+        this.clientBidId = clientBidId;
+        this.status = BidStatus.ACTIVE;
+    }
+
     public Listing getListing() { return listing; }
     public void setListing(Listing listing) { this.listing = listing; }
 
@@ -61,6 +73,9 @@ public class Bid extends BaseEntity {
 
     public DeliveryAddress getDeliveryAddress() { return deliveryAddress; }
     public void setDeliveryAddress(DeliveryAddress deliveryAddress) { this.deliveryAddress = deliveryAddress; }
+
+    public String getClientBidId() { return clientBidId; }
+    public void setClientBidId(String clientBidId) { this.clientBidId = clientBidId; }
 
     public BidStatus getStatus() { return status; }
     public void setStatus(BidStatus status) { this.status = status; }

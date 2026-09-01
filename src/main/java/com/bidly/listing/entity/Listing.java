@@ -104,6 +104,10 @@ public class Listing extends BaseEntity {
     @Column(name = "reel_url", columnDefinition = "TEXT")
     private String reelUrl;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "media_processing_status", nullable = false, length = 20)
+    private MediaProcessingStatus mediaProcessingStatus = MediaProcessingStatus.READY;
+
     @Column(name = "rating")
     private Double rating = 4.5;
 
@@ -134,6 +138,10 @@ public class Listing extends BaseEntity {
     private List<ListingMedia> media = new ArrayList<>();
 
     public Listing() {}
+
+    public enum MediaProcessingStatus {
+        PROCESSING, READY, FAILED
+    }
 
     public enum Condition {
         NEW, LIKE_NEW, EXCELLENT, GOOD, FAIR, POOR, USED, REFURBISHED
@@ -221,6 +229,9 @@ public class Listing extends BaseEntity {
 
     public String getReelUrl() { return reelUrl; }
     public void setReelUrl(String reelUrl) { this.reelUrl = reelUrl; }
+
+    public MediaProcessingStatus getMediaProcessingStatus() { return mediaProcessingStatus; }
+    public void setMediaProcessingStatus(MediaProcessingStatus mediaProcessingStatus) { this.mediaProcessingStatus = mediaProcessingStatus; }
 
     public Double getRating() { return rating; }
     public void setRating(Double rating) { this.rating = rating; }

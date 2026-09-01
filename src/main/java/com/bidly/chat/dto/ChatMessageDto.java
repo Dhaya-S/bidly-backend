@@ -9,25 +9,58 @@ public class ChatMessageDto {
     private UUID roomId;
     private UUID senderId;
     private String senderName;
+    private String clientMessageId;
     private String content;
     private BigDecimal offerAmount;
     private String type;
+    private String status;
+    private Instant readAt;
+    private String mediaUrl;
+    private String metadata;
+    private boolean isMine;
     private Instant createdAt;
+
+    public ChatMessageDto() {}
 
     public UUID getId()                        { return id; }
     public void setId(UUID id)                 { this.id = id; }
+
     public UUID getRoomId()                    { return roomId; }
     public void setRoomId(UUID v)              { this.roomId = v; }
+
     public UUID getSenderId()                  { return senderId; }
     public void setSenderId(UUID v)            { this.senderId = v; }
+
     public String getSenderName()              { return senderName; }
     public void setSenderName(String v)        { this.senderName = v; }
+
+    public String getClientMessageId()         { return clientMessageId; }
+    public void setClientMessageId(String v)   { this.clientMessageId = v; }
+
     public String getContent()                 { return content; }
     public void setContent(String v)           { this.content = v; }
+
     public BigDecimal getOfferAmount()         { return offerAmount; }
     public void setOfferAmount(BigDecimal v)   { this.offerAmount = v; }
+
     public String getType()                    { return type; }
     public void setType(String v)              { this.type = v; }
+
+    public String getStatus()                  { return status; }
+    public void setStatus(String v)            { this.status = v; }
+
+    public Instant getReadAt()                 { return readAt; }
+    public void setReadAt(Instant v)           { this.readAt = v; }
+
+    public String getMediaUrl()                { return mediaUrl; }
+    public void setMediaUrl(String v)          { this.mediaUrl = v; }
+
+    public String getMetadata()                { return metadata; }
+    public void setMetadata(String v)          { this.metadata = v; }
+
+    public boolean isMine()                    { return isMine; }
+    public void setMine(boolean v)             { this.isMine = v; }
+
     public Instant getCreatedAt()              { return createdAt; }
     public void setCreatedAt(Instant v)        { this.createdAt = v; }
 }

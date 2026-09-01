@@ -46,6 +46,7 @@ public class ListingService {
     private final CommunityRepository communityRepository;
     private final CommunityPostRepository communityPostRepository;
     private final MediaService mediaService;
+    private final com.bidly.media.repository.MediaJobRepository mediaJobRepository;
 
     public ListingService(
             ListingRepository listingRepository,
@@ -55,7 +56,8 @@ public class ListingService {
             UserRepository userRepository,
             CommunityRepository communityRepository,
             CommunityPostRepository communityPostRepository,
-            MediaService mediaService) {
+            MediaService mediaService,
+            com.bidly.media.repository.MediaJobRepository mediaJobRepository) {
         this.listingRepository = listingRepository;
         this.mediaRepository = mediaRepository;
         this.listingLikeRepository = listingLikeRepository;
@@ -64,6 +66,7 @@ public class ListingService {
         this.communityRepository = communityRepository;
         this.communityPostRepository = communityPostRepository;
         this.mediaService = mediaService;
+        this.mediaJobRepository = mediaJobRepository;
     }
 
     /**
@@ -159,6 +162,22 @@ public class ListingService {
         }
 
         listing.setReelUrl(request.getReelUrl());
+        if (request.getReelUrl() != null && !request.getReelUrl().isBlank()) {
+            mediaJobRepository.findFirstByMediaUrlOrderByCreatedAtDesc(request.getReelUrl().trim()).ifPresentOrElse(
+                    job -> {
+                        if (job.getStatus() == com.bidly.media.entity.MediaJob.ProcessingStatus.PROCESSING) {
+                            listing.setMediaProcessingStatus(Listing.MediaProcessingStatus.PROCESSING);
+                        } else if (job.getStatus() == com.bidly.media.entity.MediaJob.ProcessingStatus.FAILED) {
+                            listing.setMediaProcessingStatus(Listing.MediaProcessingStatus.FAILED);
+                        } else {
+                            listing.setMediaProcessingStatus(Listing.MediaProcessingStatus.READY);
+                        }
+                    },
+                    () -> listing.setMediaProcessingStatus(Listing.MediaProcessingStatus.READY)
+            );
+        } else {
+            listing.setMediaProcessingStatus(Listing.MediaProcessingStatus.READY);
+        }
         listing.setStatus(Listing.ListingStatus.ACTIVE);
         listing.setRating(seller.getTrustScore() > 0 ? (seller.getTrustScore() / 20.0) : 4.8);
         listing.setDistanceKm(0.0); // 0km distance for the creator
@@ -232,13 +251,17 @@ public class ListingService {
     }
 
     /**
-     * Search and filter listings with true database-level pagination and lightweight card mapping.
+     * Search and filter listings with true database-level pagination, price, condition, category, and sorting.
      */
     @Transactional(readOnly = true)
     public List<ListingSummaryDto> searchListings(
             String keyword,
             String category,
             String method,
+            String sortBy,
+            BigDecimal minPrice,
+            BigDecimal maxPrice,
+            String condition,
             Double lat,
             Double lng,
             Integer radiusKm,
@@ -281,14 +304,33 @@ public class ListingService {
                 predicates.add(cb.or(titleLike, descLike));
             }
 
-            if (category != null && !category.equalsIgnoreCase("ALL")) {
-                predicates.add(cb.equal(cb.lower(root.join("category", jakarta.persistence.criteria.JoinType.LEFT).get("name")), category.toLowerCase()));
+            if (category != null && !category.trim().isEmpty() && !category.equalsIgnoreCase("ALL")) {
+                String catTerm = "%" + category.trim().toLowerCase() + "%";
+                Predicate catNameLike = cb.like(cb.lower(root.join("category", jakarta.persistence.criteria.JoinType.LEFT).get("name")), catTerm);
+                Predicate subcatLike = cb.like(cb.lower(root.get("subcategory")), catTerm);
+                predicates.add(cb.or(catNameLike, subcatLike));
             }
 
-            if (method != null && !method.equalsIgnoreCase("ALL")) {
+            if (method != null && !method.trim().isEmpty() && !method.equalsIgnoreCase("ALL")) {
                 try {
-                    Listing.SellingMethod sellingMethod = Listing.SellingMethod.valueOf(method.toUpperCase());
+                    String cleanMethod = method.equalsIgnoreCase("BIDDING") ? "AUCTION" : method.toUpperCase();
+                    Listing.SellingMethod sellingMethod = Listing.SellingMethod.valueOf(cleanMethod);
                     predicates.add(cb.equal(root.get("sellingMethod"), sellingMethod));
+                } catch (Exception ignored) {}
+            }
+
+            if (minPrice != null && minPrice.signum() > 0) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("price"), minPrice));
+            }
+
+            if (maxPrice != null && maxPrice.signum() > 0) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("price"), maxPrice));
+            }
+
+            if (condition != null && !condition.trim().isEmpty() && !condition.equalsIgnoreCase("ANY") && !condition.equalsIgnoreCase("ALL")) {
+                try {
+                    Listing.Condition cond = Listing.Condition.valueOf(condition.trim().toUpperCase().replace(" ", "_"));
+                    predicates.add(cb.equal(root.get("condition"), cond));
                 } catch (Exception ignored) {}
             }
 
@@ -299,7 +341,19 @@ public class ListingService {
                 predicates.add(cb.between(root.get("longitude"), filterLng - deltaLng, filterLng + deltaLng));
             }
 
-            query.orderBy(cb.desc(root.get("createdAt")));
+            // Ordering / Sorting
+            if ("price_asc".equalsIgnoreCase(sortBy) || "price_low_high".equalsIgnoreCase(sortBy)) {
+                query.orderBy(cb.asc(root.get("price")));
+            } else if ("price_desc".equalsIgnoreCase(sortBy) || "price_high_low".equalsIgnoreCase(sortBy)) {
+                query.orderBy(cb.desc(root.get("price")));
+            } else if ("ending_soon".equalsIgnoreCase(sortBy)) {
+                query.orderBy(cb.asc(root.get("auctionEndTime")), cb.desc(root.get("createdAt")));
+            } else if ("newest".equalsIgnoreCase(sortBy)) {
+                query.orderBy(cb.desc(root.get("createdAt")));
+            } else {
+                query.orderBy(cb.desc(root.get("createdAt")));
+            }
+
             return cb.and(predicates.toArray(new Predicate[0]));
         };
 
@@ -357,10 +411,15 @@ public class ListingService {
         long mappingMs = System.currentTimeMillis() - t2;
         long totalMs = System.currentTimeMillis() - start;
 
-        log.info("[REEL_API] page={} size={} db_ms={} likes_ms={} mapping_ms={} total_ms={} count={}",
+        log.info("[REELS_PAGINATION] page={} size={} db_ms={} likes_ms={} mapping_ms={} total_ms={} count={}",
                 page, size, dbMs, likesMs, mappingMs, totalMs, results.size());
 
         return results;
+    }
+
+    @Transactional(readOnly = true)
+    public long countActiveReels() {
+        return listingRepository.countActiveReels(Listing.ListingStatus.ACTIVE);
     }
 
     /**
@@ -686,50 +745,74 @@ public class ListingService {
 
     @Transactional
     public ListingSummaryDto toggleLikeListing(UUID listingId, UUID userId, Boolean desiredLiked) {
+        Map<String, Object> map = toggleLikeListingWithAction(userId, listingId, desiredLiked != null ? (desiredLiked ? "like" : "unlike") : null);
         Listing listing = listingRepository.findById(listingId)
                 .orElseThrow(() -> BidlyException.notFound("Listing not found: " + listingId));
-        if (userId == null) {
-            throw BidlyException.unauthorized("Authentication required to like a listing");
-        }
-        boolean alreadyLiked = listingLikeRepository.existsByUserIdAndListingId(userId, listingId);
-        int newLikesCount = listing.getLikesCount();
-
-        if (desiredLiked != null) {
-            if (desiredLiked && !alreadyLiked) {
-                listingLikeRepository.save(new ListingLike(userId, listingId));
-                newLikesCount = listing.getLikesCount() + 1;
-                listing.setLikesCount(newLikesCount);
-                listingRepository.saveAndFlush(listing);
-            } else if (!desiredLiked && alreadyLiked) {
-                listingLikeRepository.deleteByUserIdAndListingId(userId, listingId);
-                newLikesCount = Math.max(0, listing.getLikesCount() - 1);
-                listing.setLikesCount(newLikesCount);
-                listingRepository.saveAndFlush(listing);
-            }
-        } else {
-            if (alreadyLiked) {
-                listingLikeRepository.deleteByUserIdAndListingId(userId, listingId);
-                newLikesCount = Math.max(0, listing.getLikesCount() - 1);
-                listing.setLikesCount(newLikesCount);
-                listingRepository.saveAndFlush(listing);
-            } else {
-                listingLikeRepository.save(new ListingLike(userId, listingId));
-                newLikesCount = listing.getLikesCount() + 1;
-                listing.setLikesCount(newLikesCount);
-                listingRepository.saveAndFlush(listing);
-            }
-        }
-
-        boolean finalLiked = listingLikeRepository.existsByUserIdAndListingId(userId, listingId);
         ListingSummaryDto dto = mapToSummaryDto(listing, userId);
-        dto.setLikedByMe(finalLiked);
-        dto.setLikesCount(newLikesCount);
+        dto.setLikedByMe((Boolean) map.get("likedByMe"));
+        dto.setLikesCount((Integer) map.get("likesCount"));
         return dto;
     }
 
     @Transactional
     public ListingSummaryDto toggleLikeListing(UUID listingId, UUID userId) {
         return toggleLikeListing(listingId, userId, null);
+    }
+
+    @Transactional
+    public Map<String, Object> toggleLikeListingWithAction(UUID userId, UUID listingId, String action) {
+        if (userId == null) {
+            throw BidlyException.unauthorized("Authentication required to like a listing");
+        }
+        Listing listing = listingRepository.findById(listingId)
+                .orElseThrow(() -> BidlyException.notFound("Listing not found: " + listingId));
+
+        boolean alreadyLiked = listingLikeRepository.existsByUserIdAndListingId(userId, listingId);
+        Boolean desiredLiked = null;
+        if ("like".equalsIgnoreCase(action)) {
+            desiredLiked = true;
+        } else if ("unlike".equalsIgnoreCase(action)) {
+            desiredLiked = false;
+        }
+
+        int currentCount = listing.getLikesCount();
+        int newCount = currentCount;
+
+        if (desiredLiked != null) {
+            if (desiredLiked && !alreadyLiked) {
+                listingLikeRepository.save(new ListingLike(userId, listingId));
+                newCount = currentCount + 1;
+                listing.setLikesCount(newCount);
+                listingRepository.saveAndFlush(listing);
+            } else if (!desiredLiked && alreadyLiked) {
+                listingLikeRepository.deleteByUserIdAndListingId(userId, listingId);
+                newCount = Math.max(0, currentCount - 1);
+                listing.setLikesCount(newCount);
+                listingRepository.saveAndFlush(listing);
+            }
+        } else {
+            if (alreadyLiked) {
+                listingLikeRepository.deleteByUserIdAndListingId(userId, listingId);
+                newCount = Math.max(0, currentCount - 1);
+                listing.setLikesCount(newCount);
+                listingRepository.saveAndFlush(listing);
+            } else {
+                listingLikeRepository.save(new ListingLike(userId, listingId));
+                newCount = currentCount + 1;
+                listing.setLikesCount(newCount);
+                listingRepository.saveAndFlush(listing);
+            }
+        }
+
+        boolean finalLiked = listingLikeRepository.existsByUserIdAndListingId(userId, listingId);
+        log.info("[LIKE_REEL] listing={} action={} finalLiked={} count={}", listingId, action, finalLiked, newCount);
+
+        return Map.of(
+                "liked", finalLiked,
+                "likedByMe", finalLiked,
+                "isLikedByMe", finalLiked,
+                "likesCount", newCount
+        );
     }
 
     /**

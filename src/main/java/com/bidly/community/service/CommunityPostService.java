@@ -26,6 +26,8 @@ import com.bidly.listing.entity.ListingMedia;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -63,10 +65,25 @@ public class CommunityPostService {
      */
     @Transactional(readOnly = true)
     public List<PostDto> getFeed(UUID currentUserId, int page, int size) {
+        long t0 = System.currentTimeMillis();
         Page<CommunityPost> postsPage = postRepository.findByCommunityIsNullOrderByCreatedAtDesc(PageRequest.of(page, size));
-        return postsPage.getContent().stream()
-                .map(post -> mapToDto(post, currentUserId))
+        long t1 = System.currentTimeMillis();
+
+        List<CommunityPost> content = postsPage.getContent();
+        Set<UUID> likedPostIds = Collections.emptySet();
+        if (currentUserId != null && !content.isEmpty()) {
+            List<UUID> postIds = content.stream().map(CommunityPost::getId).collect(Collectors.toList());
+            likedPostIds = postLikeRepository.findLikedPostIdsByUserIdAndPostIds(currentUserId, postIds);
+        }
+
+        final Set<UUID> finalLikedIds = likedPostIds;
+        List<PostDto> results = content.stream()
+                .map(post -> mapToDto(post, currentUserId, finalLikedIds))
                 .collect(Collectors.toList());
+        long t2 = System.currentTimeMillis();
+        log.info("[POST_API] page={} size={} db_ms={} mapping_ms={} total_ms={} count={}",
+                page, size, (t1 - t0), (t2 - t1), (t2 - t0), results.size());
+        return results;
     }
 
     /**
@@ -74,10 +91,25 @@ public class CommunityPostService {
      */
     @Transactional(readOnly = true)
     public List<PostDto> getCommunityPosts(UUID communityId, UUID currentUserId, int page, int size) {
+        long t0 = System.currentTimeMillis();
         Page<CommunityPost> postsPage = postRepository.findByCommunityIdOrderByCreatedAtDesc(communityId, PageRequest.of(page, size));
-        return postsPage.getContent().stream()
-                .map(post -> mapToDto(post, currentUserId))
+        long t1 = System.currentTimeMillis();
+
+        List<CommunityPost> content = postsPage.getContent();
+        Set<UUID> likedPostIds = Collections.emptySet();
+        if (currentUserId != null && !content.isEmpty()) {
+            List<UUID> postIds = content.stream().map(CommunityPost::getId).collect(Collectors.toList());
+            likedPostIds = postLikeRepository.findLikedPostIdsByUserIdAndPostIds(currentUserId, postIds);
+        }
+
+        final Set<UUID> finalLikedIds = likedPostIds;
+        List<PostDto> results = content.stream()
+                .map(post -> mapToDto(post, currentUserId, finalLikedIds))
                 .collect(Collectors.toList());
+        long t2 = System.currentTimeMillis();
+        log.info("[COMMUNITY_POST_API] communityId={} page={} size={} db_ms={} mapping_ms={} total_ms={} count={}",
+                communityId, page, size, (t1 - t0), (t2 - t1), (t2 - t0), results.size());
+        return results;
     }
 
     /**
@@ -118,28 +150,72 @@ public class CommunityPostService {
         CommunityPost saved = postRepository.save(post);
         log.info("Created post {} by user {}", saved.getId(), authorId);
 
-        return mapToDto(saved, authorId);
+        return mapToDto(saved, authorId, Collections.emptySet());
     }
 
     /**
-     * Toggles like/unlike on a post.
+     * Toggles or ensures like/unlike on a post with idempotency and transaction safety.
      */
     @Transactional
-    public boolean toggleLike(UUID userId, UUID postId) {
-        if (!postRepository.existsById(postId)) {
-            throw BidlyException.notFound("Post");
+    public Map<String, Object> toggleLike(UUID userId, UUID postId, String action) {
+        if (userId == null) {
+            throw BidlyException.unauthorized("Authentication required to like a post");
         }
+        CommunityPost post = postRepository.findById(postId)
+                .orElseThrow(() -> BidlyException.notFound("Post not found: " + postId));
 
         boolean alreadyLiked = postLikeRepository.existsByUserIdAndPostId(userId, postId);
-        if (alreadyLiked) {
-            postLikeRepository.deleteByUserIdAndPostId(userId, postId);
-            postRepository.decrementLikes(postId);
-            return false;
-        } else {
-            postLikeRepository.save(new PostLike(userId, postId));
-            postRepository.incrementLikes(postId);
-            return true;
+        Boolean desiredLiked = null;
+        if ("like".equalsIgnoreCase(action)) {
+            desiredLiked = true;
+        } else if ("unlike".equalsIgnoreCase(action)) {
+            desiredLiked = false;
         }
+
+        int currentCount = post.getLikesCount();
+        int newCount = currentCount;
+
+        if (desiredLiked != null) {
+            if (desiredLiked && !alreadyLiked) {
+                postLikeRepository.save(new PostLike(userId, postId));
+                newCount = currentCount + 1;
+                post.setLikesCount(newCount);
+                postRepository.saveAndFlush(post);
+            } else if (!desiredLiked && alreadyLiked) {
+                postLikeRepository.deleteByUserIdAndPostId(userId, postId);
+                newCount = Math.max(0, currentCount - 1);
+                post.setLikesCount(newCount);
+                postRepository.saveAndFlush(post);
+            }
+        } else {
+            if (alreadyLiked) {
+                postLikeRepository.deleteByUserIdAndPostId(userId, postId);
+                newCount = Math.max(0, currentCount - 1);
+                post.setLikesCount(newCount);
+                postRepository.saveAndFlush(post);
+            } else {
+                postLikeRepository.save(new PostLike(userId, postId));
+                newCount = currentCount + 1;
+                post.setLikesCount(newCount);
+                postRepository.saveAndFlush(post);
+            }
+        }
+
+        boolean finalLiked = postLikeRepository.existsByUserIdAndPostId(userId, postId);
+        log.info("[LIKE_POST] post={} action={} finalLiked={} count={}", postId, action, finalLiked, newCount);
+
+        return Map.of(
+                "liked", finalLiked,
+                "likedByMe", finalLiked,
+                "isLikedByMe", finalLiked,
+                "likesCount", newCount
+        );
+    }
+
+    @Transactional
+    public boolean toggleLike(UUID userId, UUID postId) {
+        Map<String, Object> res = toggleLike(userId, postId, null);
+        return (Boolean) res.get("liked");
     }
 
     /**
@@ -162,7 +238,7 @@ public class CommunityPostService {
                 .collect(Collectors.toList());
     }
 
-    private PostDto mapToDto(CommunityPost post, UUID currentUserId) {
+    private PostDto mapToDto(CommunityPost post, UUID currentUserId, Set<UUID> likedPostIds) {
         PostDto dto = new PostDto();
         dto.setId(post.getId());
         if (post.getAuthor() != null) {
@@ -233,7 +309,9 @@ public class CommunityPostService {
             dto.setMediaItems(Collections.emptyList());
         }
 
-        if (currentUserId != null) {
+        if (likedPostIds != null && !likedPostIds.isEmpty()) {
+            dto.setLikedByMe(likedPostIds.contains(post.getId()));
+        } else if (currentUserId != null && likedPostIds == null) {
             dto.setLikedByMe(postLikeRepository.existsByUserIdAndPostId(currentUserId, post.getId()));
         } else {
             dto.setLikedByMe(false);

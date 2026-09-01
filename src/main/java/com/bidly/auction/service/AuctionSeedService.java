@@ -79,50 +79,20 @@ public class AuctionSeedService {
                 }
             }
 
-            // 2. Find any active AUCTION listing or ensure sample auction has bids
+            // 2. Ensure existing auction listings have valid end times without inserting mock bids
             List<Listing> auctionListings = listingRepository.findAll().stream()
                     .filter(l -> l.getSellingMethod() == Listing.SellingMethod.AUCTION)
                     .toList();
 
             for (Listing listing : auctionListings) {
-                if (listing.getAuctionEndTime() == null || Instant.now().isAfter(listing.getAuctionEndTime())) {
-                    listing.setAuctionEndTime(Instant.now().plus(Duration.ofHours(2).plusMinutes(14)));
+                if (listing.getAuctionEndTime() == null) {
+                    listing.setAuctionEndTime(Instant.now().plus(Duration.ofHours(24)));
                     listing.setStatus(Listing.ListingStatus.ACTIVE);
                     listingRepository.save(listing);
                 }
-
-                if (bidRepository.countByListingId(listing.getId()) == 0) {
-                    // Seed realistic bids matching the visual UI reference
-                    User seller = listing.getSeller();
-                    List<User> otherUsers = users.stream()
-                            .filter(u -> !u.getId().equals(seller.getId()))
-                            .toList();
-
-                    if (!otherUsers.isEmpty()) {
-                        User buyer1 = otherUsers.get(0);
-                        User buyer2 = otherUsers.size() > 1 ? otherUsers.get(1) : otherUsers.get(0);
-
-                        BigDecimal start = listing.getStartingBid() != null ? listing.getStartingBid() : BigDecimal.valueOf(30000.00);
-                        BigDecimal b1 = start.add(BigDecimal.valueOf(3000));
-                        BigDecimal b2 = b1.add(BigDecimal.valueOf(3000));
-                        BigDecimal b3 = b2.add(BigDecimal.valueOf(2500));
-                        BigDecimal b4 = b3.add(BigDecimal.valueOf(4000)); // e.g. 42500
-
-                        bidRepository.save(new Bid(listing, buyer1, b1, null));
-                        bidRepository.save(new Bid(listing, buyer2, b2, null));
-                        bidRepository.save(new Bid(listing, buyer1, b3, null));
-                        Bid top = bidRepository.save(new Bid(listing, buyer2, b4, null));
-
-                        listing.setCurrentBid(b4);
-                        listing.setBidsCount(4);
-                        listingRepository.save(listing);
-
-                        log.info("Seeded initial auction bids for listing '{}' (Highest bid: ₹{})", listing.getTitle(), b4);
-                    }
-                }
             }
         } catch (Exception e) {
-            log.warn("Auction seed skipped: {}", e.getMessage());
+            log.warn("Auction initialization skipped: {}", e.getMessage());
         }
     }
 }

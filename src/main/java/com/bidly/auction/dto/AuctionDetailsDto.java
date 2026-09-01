@@ -38,6 +38,7 @@ public class AuctionDetailsDto {
     private int sellerSalesCount;
     private String city;
     private String state;
+    private Instant serverTimestamp = Instant.now();
     private List<BidHistoryItemDto> recentBids;
 
     public AuctionDetailsDto() {}
@@ -137,6 +138,9 @@ public class AuctionDetailsDto {
 
     public String getState() { return state; }
     public void setState(String state) { this.state = state; }
+
+    public Instant getServerTimestamp() { return serverTimestamp; }
+    public void setServerTimestamp(Instant serverTimestamp) { this.serverTimestamp = serverTimestamp; }
 
     public List<BidHistoryItemDto> getRecentBids() { return recentBids; }
     public void setRecentBids(List<BidHistoryItemDto> recentBids) { this.recentBids = recentBids; }

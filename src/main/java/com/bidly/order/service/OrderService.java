@@ -287,12 +287,12 @@ public class OrderService {
         dto.setDeliveredAt(o.getDeliveredAt());
 
         dto.setBuyerId(o.getBuyer().getId());
-        dto.setBuyerName(o.getBuyer().getName() != null ? o.getBuyer().getName() : "Verified Buyer");
+        dto.setBuyerName(o.getBuyer().getName() != null ? o.getBuyer().getName() : "");
 
         dto.setSellerId(o.getSeller().getId());
-        dto.setSellerName(o.getSeller().getName() != null ? o.getSeller().getName() : "Arun Tech Deals");
-        dto.setSellerRating(o.getListing().getRating() != null ? o.getListing().getRating() : 4.9);
-        dto.setSellerSalesCount(312);
+        dto.setSellerName(o.getSeller().getName() != null ? o.getSeller().getName() : "");
+        dto.setSellerRating(o.getListing().getRating() != null ? o.getListing().getRating() : 0.0);
+        dto.setSellerSalesCount(0);
 
         if (o.getDeliveryAddress() != null) {
             dto.setDeliveryAddressFullName(o.getDeliveryAddress().getFullName());
@@ -302,10 +302,10 @@ public class OrderService {
             dto.setDeliveryAddressPincode(o.getDeliveryAddress().getPincode());
         } else {
             dto.setDeliveryAddressFullName(dto.getBuyerName());
-            dto.setDeliveryAddressPhone("+91 98765 43210");
-            dto.setDeliveryAddressLine("42, Anna Nagar 3rd Street");
-            dto.setDeliveryAddressCity("Chennai");
-            dto.setDeliveryAddressPincode("600040");
+            dto.setDeliveryAddressPhone(o.getBuyer().getPhone() != null ? o.getBuyer().getPhone() : "");
+            dto.setDeliveryAddressLine("");
+            dto.setDeliveryAddressCity("");
+            dto.setDeliveryAddressPincode("");
         }
 
         dto.setOrderSource(o.getOrderSource() != null ? o.getOrderSource().name() : "AUCTION");

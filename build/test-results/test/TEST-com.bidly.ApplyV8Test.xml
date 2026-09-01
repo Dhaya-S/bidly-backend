@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.bidly.ApplyV8Test" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-08-28T11:54:52" hostname="DESKTOP-AMTTKL1" time="24.356">
-  <properties/>
-  <testcase name="applyV8V9V10Migration()" classname="com.bidly.ApplyV8Test" time="24.356"/>
-  <system-out><![CDATA[>>> SUCCESS: V10 Community Migrations and Flyway repaired on Neon DB! <<<
-]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

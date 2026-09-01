@@ -31,8 +31,10 @@ public class SecurityConfig {
             "/posts/**",
             "/categories/**",
             "/listings/**",
+            "/auctions/**",
             "/media/**",
             "/communities/**",
+            "/ws/**",
             "/actuator/health"
     };
 

@@ -1,6 +1,7 @@
 package com.bidly.auction.dto;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -21,6 +22,7 @@ public class AuctionLiveStatusDto {
     private BigDecimal behindByAmount;
     private UUID highestBidderId;
     private String highestBidderName;
+    private Instant serverTimestamp = Instant.now();
     private List<BidHistoryItemDto> liveBidFeed;
 
     public AuctionLiveStatusDto() {}
@@ -72,6 +74,9 @@ public class AuctionLiveStatusDto {
 
     public String getHighestBidderName() { return highestBidderName; }
     public void setHighestBidderName(String highestBidderName) { this.highestBidderName = highestBidderName; }
+
+    public Instant getServerTimestamp() { return serverTimestamp; }
+    public void setServerTimestamp(Instant serverTimestamp) { this.serverTimestamp = serverTimestamp; }
 
     public List<BidHistoryItemDto> getLiveBidFeed() { return liveBidFeed; }
     public void setLiveBidFeed(List<BidHistoryItemDto> liveBidFeed) { this.liveBidFeed = liveBidFeed; }

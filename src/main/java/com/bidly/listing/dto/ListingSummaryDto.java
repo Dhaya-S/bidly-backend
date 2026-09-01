@@ -43,6 +43,11 @@ public class ListingSummaryDto {
     @com.fasterxml.jackson.annotation.JsonProperty("isLikedByMe")
     private boolean isLikedByMe;
 
+    @com.fasterxml.jackson.annotation.JsonProperty("likedByMe")
+    public boolean getLikedByMe() {
+        return isLikedByMe;
+    }
+
     public ListingSummaryDto() {}
 
     public int getLikesCount() { return likesCount; }

@@ -6,11 +6,14 @@ import com.bidly.chat.dto.CreateRoomRequest;
 import com.bidly.chat.dto.SendMessageRequest;
 import com.bidly.chat.service.ChatService;
 import com.bidly.common.dto.ApiResponse;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -45,19 +48,21 @@ public class ChatController {
     }
 
     /**
-     * GET /api/chat/rooms/{roomId}/messages - Get messages in room with optional since ISO timestamp
+     * GET /api/chat/rooms/{roomId}/messages - Get messages in room with optional pagination
      */
     @GetMapping("/rooms/{roomId}/messages")
     public ResponseEntity<ApiResponse<List<ChatMessageDto>>> getMessages(
             @PathVariable UUID roomId,
-            @RequestParam(required = false) String since,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant beforeCreatedAt,
+            @RequestParam(required = false) UUID beforeId,
+            @RequestParam(required = false, defaultValue = "50") Integer limit,
             @AuthenticationPrincipal UUID currentUserId) {
-        List<ChatMessageDto> messages = chatService.getMessages(roomId, currentUserId, since);
+        List<ChatMessageDto> messages = chatService.getMessages(roomId, currentUserId, beforeCreatedAt, beforeId, limit);
         return ResponseEntity.ok(ApiResponse.success(messages));
     }
 
     /**
-     * POST /api/chat/rooms/{roomId}/messages - Send text message or offer
+     * POST /api/chat/rooms/{roomId}/messages - Send text message, offer, meetup, or image
      */
     @PostMapping("/rooms/{roomId}/messages")
     public ResponseEntity<ApiResponse<ChatMessageDto>> sendMessage(
@@ -66,5 +71,29 @@ public class ChatController {
             @RequestBody SendMessageRequest request) {
         ChatMessageDto message = chatService.sendMessage(roomId, currentUserId, request);
         return ResponseEntity.ok(ApiResponse.success("Message sent", message));
+    }
+
+    /**
+     * POST /api/chat/rooms/{roomId}/read - Mark messages as read and broadcast receipt
+     */
+    @PostMapping("/rooms/{roomId}/read")
+    public ResponseEntity<ApiResponse<Void>> markAsRead(
+            @PathVariable UUID roomId,
+            @AuthenticationPrincipal UUID currentUserId) {
+        chatService.markRoomMessagesAsRead(roomId, currentUserId);
+        return ResponseEntity.ok(ApiResponse.success("Messages marked as read", null));
+    }
+
+    /**
+     * POST /api/chat/rooms/{roomId}/typing - Send ephemeral typing indicator
+     */
+    @PostMapping("/rooms/{roomId}/typing")
+    public ResponseEntity<ApiResponse<Void>> sendTyping(
+            @PathVariable UUID roomId,
+            @RequestBody Map<String, Boolean> body,
+            @AuthenticationPrincipal UUID currentUserId) {
+        boolean isTyping = body != null && Boolean.TRUE.equals(body.get("isTyping"));
+        chatService.sendTypingIndicator(roomId, currentUserId, isTyping);
+        return ResponseEntity.ok(ApiResponse.success("Typing event processed", null));
     }
 }

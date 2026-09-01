@@ -16,13 +16,13 @@ spring:
     password: ${NEON_DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
     hikari:
-      maximum-pool-size: 10
-      minimum-idle: 3
+      maximum-pool-size: 15
+      minimum-idle: 5
       connection-timeout: 10000
-      validation-timeout: 2000
-      idle-timeout: 30000        # 30s
-      max-lifetime: 45000        # 45s (keeps connections fresh for Neon serverless pooler)
-      keepalive-time: 15000       # 15s proactive ping
+      validation-timeout: 3000
+      idle-timeout: 45000        # 45s
+      max-lifetime: 55000        # 55s (retires connections before Neon pooler idle disconnect)
+      keepalive-time: 30000      # 30s (HikariCP minimum valid threshold)
 
   # ─── JPA / Hibernate ───────────────────────────────────────
   jpa:

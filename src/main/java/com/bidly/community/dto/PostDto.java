@@ -24,6 +24,11 @@ public class PostDto {
     @com.fasterxml.jackson.annotation.JsonProperty("isLikedByMe")
     private boolean isLikedByMe;
 
+    @com.fasterxml.jackson.annotation.JsonProperty("likedByMe")
+    public boolean getLikedByMe() {
+        return isLikedByMe;
+    }
+
     private Instant createdAt;
 
     // Instagram-style rich media items & optional linked listing details

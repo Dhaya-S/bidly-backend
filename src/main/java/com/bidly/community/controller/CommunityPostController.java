@@ -61,14 +61,15 @@ public class CommunityPostController {
     }
 
     /**
-     * POST /api/posts/{id}/like — Toggle like on a post
+     * POST /api/posts/{id}/like — Toggle or ensure like/unlike on a post
      */
     @PostMapping("/{id}/like")
     public ResponseEntity<ApiResponse<Map<String, Object>>> toggleLike(
             @AuthenticationPrincipal UUID userId,
-            @PathVariable UUID id) {
-        boolean isLiked = postService.toggleLike(userId, id);
-        return ResponseEntity.ok(ApiResponse.success(Map.of("liked", isLiked)));
+            @PathVariable UUID id,
+            @RequestParam(required = false) String action) {
+        Map<String, Object> result = postService.toggleLike(userId, id, action);
+        return ResponseEntity.ok(ApiResponse.success(result));
     }
 
     /**
