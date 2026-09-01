@@ -65,9 +65,6 @@ RUN ffmpeg -version 2>&1 | head -1 && \
 RUN groupadd --gid 1001 appgroup && \
     useradd  --uid 1001 --gid appgroup --shell /bin/bash --create-home appuser
 
-# -- Writable temp directory for video transcoding -----------------
-RUN mkdir -p /tmp/bidly_media && \
-    chown appuser:appgroup /tmp/bidly_media
 
 WORKDIR /app
 
@@ -81,8 +78,9 @@ USER appuser
 EXPOSE 8081
 
 # -- Runtime entry-point ------------------------------------------
-# Render sets $PORT at container start; Spring reads it via
-# server.port=${PORT:8081} in application.yml.
-# We also force a writable tmp dir for FFmpeg temp files.
+# Render injects $PORT; Spring reads it via server.port=${PORT:8081}.
+# Do NOT override java.io.tmpdir — Tomcat needs the real /tmp to create
+# its own work dirs. VideoProcessingService creates /tmp/bidly_media
+# on demand via mkdirs() so no pre-creation is needed.
 ENTRYPOINT ["sh", "-c", \
-  "exec java -Djava.io.tmpdir=/tmp/bidly_media -Dserver.port=${PORT:-8081} -jar /app/app.jar"]
+  "exec java -Dserver.port=${PORT:-8081} -jar /app/app.jar"]
