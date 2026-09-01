@@ -17,23 +17,28 @@ WORKDIR /workspace
 # dependency-download layer is cached and only invalidated when
 # build.gradle / settings.gradle actually change.
 COPY gradle/             gradle/
-COPY gradlew             gradlew
 COPY build.gradle        build.gradle
 COPY settings.gradle     settings.gradle
 
-# Strip BOM (0xEF 0xBB 0xBF) and Windows CRLF line endings, then make executable
-RUN sed -i '1s/^\xEF\xBB\xBF//' gradlew && \
-    sed -i 's/\r$//' gradlew && \
-    chmod +x gradlew
-
-# Warm the Gradle dependency cache (resolves deps without compiling)
-RUN ./gradlew dependencies --no-daemon 2>&1 | tail -5 || true
+# -- Warm the Gradle dependency cache ------------------------------
+# Invoke GradleWrapperMain JAR directly - bypasses gradlew shell
+# script entirely (avoids all BOM/CRLF/encoding issues on Windows).
+# Gradle needs 512 MB+ heap; set explicitly with -Xmx512m.
+RUN java -Xmx512m -Xms256m \
+      -Dorg.gradle.appname=gradlew \
+      -classpath gradle/wrapper/gradle-wrapper.jar \
+      org.gradle.wrapper.GradleWrapperMain \
+      dependencies --no-daemon 2>&1 | tail -10 || true
 
 # -- Full source copy + compile ------------------------------------
 COPY src/ src/
 
 # Build the production JAR -- skip tests (run them in CI separately)
-RUN ./gradlew clean bootJar -x test --no-daemon --stacktrace
+RUN java -Xmx512m -Xms256m \
+      -Dorg.gradle.appname=gradlew \
+      -classpath gradle/wrapper/gradle-wrapper.jar \
+      org.gradle.wrapper.GradleWrapperMain \
+      clean bootJar -x test --no-daemon
 
 # Locate the JAR (handles any version suffix in the filename)
 RUN ls -lh build/libs/ && \
