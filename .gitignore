@@ -1,0 +1,17 @@
+﻿# Gradle build outputs
+.gradle/
+build/
+
+# Environment secrets
+.env
+!.env.example
+
+# IDE files
+.idea/
+*.iml
+out/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.log

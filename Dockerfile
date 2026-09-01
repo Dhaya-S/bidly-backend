@@ -1,4 +1,4 @@
-﻿# -----------------------------------------------------------------
+# -----------------------------------------------------------------
 #  Bidly Backend — Production Dockerfile
 #  Spring Boot 3.3.4 + Gradle 8.10 + Java 17 + FFmpeg / FFprobe
 #  Target: Render (Linux/amd64 container runtime)
@@ -21,7 +21,8 @@ COPY gradlew             gradlew
 COPY build.gradle        build.gradle
 COPY settings.gradle     settings.gradle
 
-RUN chmod +x gradlew
+# Strip Windows CRLF line endings that Git may have introduced, then make executable
+RUN sed -i 's/\r$//' gradlew && chmod +x gradlew
 
 # Warm the Gradle dependency cache (resolves deps without compiling)
 RUN ./gradlew dependencies --no-daemon 2>&1 | tail -5 || true

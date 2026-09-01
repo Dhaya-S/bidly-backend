@@ -1,0 +1,12 @@
+﻿# Force Unix line endings for shell scripts (critical for Docker/Linux builds)
+gradlew        text eol=lf
+*.sh           text eol=lf
+
+# Windows batch files keep CRLF
+*.bat          text eol=crlf
+
+# Declare binary files
+*.jar          binary
+*.class        binary
+*.png          binary
+*.jpg          binary
