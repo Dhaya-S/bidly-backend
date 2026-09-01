@@ -21,8 +21,10 @@ COPY gradlew             gradlew
 COPY build.gradle        build.gradle
 COPY settings.gradle     settings.gradle
 
-# Strip Windows CRLF line endings that Git may have introduced, then make executable
-RUN sed -i 's/\r$//' gradlew && chmod +x gradlew
+# Strip BOM (0xEF 0xBB 0xBF) and Windows CRLF line endings, then make executable
+RUN sed -i '1s/^\xEF\xBB\xBF//' gradlew && \
+    sed -i 's/\r$//' gradlew && \
+    chmod +x gradlew
 
 # Warm the Gradle dependency cache (resolves deps without compiling)
 RUN ./gradlew dependencies --no-daemon 2>&1 | tail -5 || true
