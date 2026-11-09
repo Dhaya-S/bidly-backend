@@ -32,6 +32,7 @@ import com.bidly.media.service.MediaService;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.UUID;
 
@@ -321,10 +322,52 @@ public class ListingService {
             }
 
             if (category != null && !category.trim().isEmpty() && !category.equalsIgnoreCase("ALL")) {
-                String catTerm = "%" + category.trim().toLowerCase() + "%";
-                Predicate catNameLike = cb.like(cb.lower(root.join("category", jakarta.persistence.criteria.JoinType.LEFT).get("name")), catTerm);
-                Predicate subcatLike = cb.like(cb.lower(root.get("subcategory")), catTerm);
-                predicates.add(cb.or(catNameLike, subcatLike));
+                String cleanCat = category.trim().toLowerCase();
+                jakarta.persistence.criteria.Join<Listing, Object> catJoin = root.join("category", jakarta.persistence.criteria.JoinType.LEFT);
+
+                List<Predicate> catPredicates = new ArrayList<>();
+                catPredicates.add(cb.like(cb.lower(catJoin.get("name")), "%" + cleanCat + "%"));
+                catPredicates.add(cb.like(cb.lower(root.get("subcategory")), "%" + cleanCat + "%"));
+
+                // Category alias & smart keyword matching for top consumer categories
+                if (cleanCat.contains("smart") || cleanCat.contains("phone") || cleanCat.contains("mobile")) {
+                    for (String kw : new String[]{"phone", "smartphone", "mobile", "iphone", "pixel", "galaxy", "oneplus"}) {
+                        String pat = "%" + kw + "%";
+                        catPredicates.add(cb.like(cb.lower(catJoin.get("name")), pat));
+                        catPredicates.add(cb.like(cb.lower(root.get("subcategory")), pat));
+                        catPredicates.add(cb.like(cb.lower(root.get("title")), pat));
+                    }
+                } else if (cleanCat.contains("vehicle") || cleanCat.contains("car") || cleanCat.contains("bike") || cleanCat.contains("scooter") || cleanCat.contains("motor")) {
+                    for (String kw : new String[]{"vehicle", "car", "bike", "scooter", "motorcycle", "bicycle", "enfield", "yamaha", "honda"}) {
+                        String pat = "%" + kw + "%";
+                        catPredicates.add(cb.like(cb.lower(catJoin.get("name")), pat));
+                        catPredicates.add(cb.like(cb.lower(root.get("subcategory")), pat));
+                        catPredicates.add(cb.like(cb.lower(root.get("title")), pat));
+                    }
+                } else if (cleanCat.contains("comput") || cleanCat.contains("laptop") || cleanCat.contains("pc")) {
+                    for (String kw : new String[]{"comput", "laptop", "macbook", "desktop", "pc"}) {
+                        String pat = "%" + kw + "%";
+                        catPredicates.add(cb.like(cb.lower(catJoin.get("name")), pat));
+                        catPredicates.add(cb.like(cb.lower(root.get("subcategory")), pat));
+                        catPredicates.add(cb.like(cb.lower(root.get("title")), pat));
+                    }
+                } else if (cleanCat.contains("game") || cleanCat.contains("gaming")) {
+                    for (String kw : new String[]{"game", "gaming", "playstation", "ps5", "xbox", "nintendo", "steam deck"}) {
+                        String pat = "%" + kw + "%";
+                        catPredicates.add(cb.like(cb.lower(catJoin.get("name")), pat));
+                        catPredicates.add(cb.like(cb.lower(root.get("subcategory")), pat));
+                        catPredicates.add(cb.like(cb.lower(root.get("title")), pat));
+                    }
+                } else if (cleanCat.contains("cam")) {
+                    for (String kw : new String[]{"camera", "cam", "gopro", "lens", "fujifilm", "alpha"}) {
+                        String pat = "%" + kw + "%";
+                        catPredicates.add(cb.like(cb.lower(catJoin.get("name")), pat));
+                        catPredicates.add(cb.like(cb.lower(root.get("subcategory")), pat));
+                        catPredicates.add(cb.like(cb.lower(root.get("title")), pat));
+                    }
+                }
+
+                predicates.add(cb.or(catPredicates.toArray(new Predicate[0])));
             }
 
             if (method != null && !method.trim().isEmpty() && !method.equalsIgnoreCase("ALL")) {
@@ -1032,14 +1075,29 @@ public class ListingService {
     @Transactional(readOnly = true)
     public List<ListingSummaryDto> getWishlist(UUID userId) {
         // Return active listings marked as liked
-        List<Listing> active = listingRepository.findTop8ByStatusAndCommunityIdIsNullOrderByCreatedAtDesc(Listing.ListingStatus.ACTIVE);
-        return active.stream()
-                .map(l -> {
-                    ListingSummaryDto dto = mapToCardDto(l, userId);
-                    dto.setWishlisted(true);
-                    dto.setLikedByMe(true);
-                    return dto;
-                })
-                .collect(Collectors.toList());
+        if (userId == null) {
+            return Collections.emptyList();
+        }
+        List<UUID> likedListingIds = listingLikeRepository.findListingIdsByUserId(userId);
+        if (likedListingIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<Listing> listings = listingRepository.findAllById(likedListingIds);
+        Map<UUID, Listing> listingMap = listings.stream()
+                .collect(Collectors.toMap(Listing::getId, Function.identity(), (a, b) -> a));
+
+        List<ListingSummaryDto> result = new ArrayList<>();
+        for (UUID id : likedListingIds) {
+            Listing l = listingMap.get(id);
+            if (l != null && l.getStatus() == Listing.ListingStatus.ACTIVE) {
+                ListingSummaryDto dto = mapToCardDto(l, userId);
+                dto.setWishlisted(true);
+                dto.setLikedByMe(true);
+                result.add(dto);
+            }
+        }
+        return result;
     }
+
+
 }

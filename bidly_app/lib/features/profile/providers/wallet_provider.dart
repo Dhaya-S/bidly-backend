@@ -1,3 +1,4 @@
+import '../../auth/providers/auth_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
 
@@ -74,12 +75,20 @@ class WalletState {
 
 class WalletNotifier extends StateNotifier<WalletState> {
   final ApiClient _apiClient;
+  final String? _userId;
 
-  WalletNotifier(this._apiClient) : super(const WalletState()) {
-    fetchWallet();
+  WalletNotifier(this._apiClient, this._userId) : super(const WalletState()) {
+    if (_userId != null && _userId.isNotEmpty) {
+      fetchWallet();
+    }
   }
 
   Future<void> fetchWallet() async {
+    final token = await _apiClient.getToken();
+    if (token == null || token.isEmpty || _userId == null || _userId.isEmpty) {
+      state = const WalletState();
+      return;
+    }
     state = state.copyWith(isLoading: true, errorMessage: null);
     try {
       final res = await _apiClient.get('/wallet');
@@ -129,9 +138,108 @@ class WalletNotifier extends StateNotifier<WalletState> {
       return null;
     }
   }
+
+  Future<Map<String, dynamic>?> createRazorpayOrder(double amount) async {
+    try {
+      final res = await _apiClient.post('/wallet/razorpay/create-order', data: {
+        'amount': amount,
+      });
+      if (res.data != null && res.data['success'] == true) {
+        return res.data['data'] as Map<String, dynamic>?;
+      }
+    } catch (e) {
+      state = state.copyWith(errorMessage: e.toString());
+    }
+    return null;
+  }
+
+  Future<WalletTransaction?> verifyRazorpayPayment({
+    required String orderId,
+    required String paymentId,
+    required String signature,
+    required double amount,
+  }) async {
+    state = state.copyWith(isAdding: true, errorMessage: null);
+    try {
+      final res = await _apiClient.post('/wallet/razorpay/verify-payment', data: {
+        'razorpayOrderId': orderId,
+        'razorpayPaymentId': paymentId,
+        'razorpaySignature': signature,
+        'amount': amount,
+      });
+      if (res.data != null && res.data['success'] == true && res.data['data'] != null) {
+        final data = res.data['data'] as Map<String, dynamic>;
+        final txn = WalletTransaction.fromJson(data);
+        state = state.copyWith(
+          balance: txn.updatedBalance,
+          isAdding: false,
+          lastTransaction: txn,
+        );
+        return txn;
+      }
+      state = state.copyWith(isAdding: false, errorMessage: 'Payment verification failed.');
+      return null;
+    } catch (e) {
+      state = state.copyWith(isAdding: false, errorMessage: e.toString());
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> createRazorpayPaymentLink(double amount, {String? name, String? phone}) async {
+    state = state.copyWith(isAdding: true, errorMessage: null);
+    try {
+      final res = await _apiClient.post('/wallet/razorpay/create-payment-link', data: {
+        'amount': amount,
+        'name': name,
+        'phone': phone,
+      });
+      if (res.data != null && res.data['success'] == true && res.data['data'] != null) {
+        return res.data['data'] as Map<String, dynamic>;
+      }
+      state = state.copyWith(
+        isAdding: false,
+        errorMessage: res.data?['message']?.toString() ?? 'Failed to generate Razorpay payment link.',
+      );
+    } catch (e) {
+      state = state.copyWith(isAdding: false, errorMessage: e.toString());
+    }
+    return null;
+  }
+
+  Future<WalletTransaction?> checkRazorpayPaymentLinkStatus(String paymentLinkId) async {
+    try {
+      final res = await _apiClient.post('/wallet/razorpay/check-payment-link', data: {
+        'paymentLinkId': paymentLinkId,
+      });
+      if (res.data != null && res.data['success'] == true && res.data['data'] != null) {
+        final data = res.data['data'] as Map<String, dynamic>;
+        if (data['status'] == 'SUCCESS') {
+          final txn = WalletTransaction.fromJson(data);
+          state = state.copyWith(
+            balance: txn.updatedBalance,
+            isAdding: false,
+            lastTransaction: txn,
+          );
+          return txn;
+        }
+      }
+    } catch (_) {
+      // Periodic check, ignore transient network drops
+    }
+    return null;
+  }
+
+  void resetAddingState() {
+    state = state.copyWith(isAdding: false);
+  }
+
+  void clear() {
+    state = const WalletState();
+  }
 }
 
 final walletProvider = StateNotifierProvider<WalletNotifier, WalletState>((ref) {
   final apiClient = ref.watch(apiClientProvider);
-  return WalletNotifier(apiClient);
+  final userId = ref.watch(authProvider.select((s) => s.user?.id));
+  return WalletNotifier(apiClient, userId);
 });

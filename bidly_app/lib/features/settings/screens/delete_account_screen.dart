@@ -1,3 +1,4 @@
+﻿import '../../../core/api/api_client.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -48,9 +49,15 @@ class DeleteAccountScreen extends ConsumerWidget {
     );
 
     if (confirmed == true && context.mounted) {
-      await ref.read(authProvider.notifier).logout();
+      try {
+        final apiClient = ref.read(apiClientProvider);
+        await apiClient.delete('/user/account');
+      } catch (_) {}
       if (context.mounted) {
-        context.go(AppRoutes.login);
+        await ref.read(authProvider.notifier).logout();
+        if (context.mounted) {
+          context.go(AppRoutes.login);
+        }
       }
     }
   }
@@ -72,7 +79,7 @@ class DeleteAccountScreen extends ConsumerWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: AppTheme.textPrimary),
-          onPressed: () => context.pop(),
+          onPressed: () { if (Navigator.of(context).canPop()) { Navigator.of(context).pop(); } else if (context.canPop()) { context.pop(); } else { Navigator.of(context).maybePop(); } },
         ),
         title: const Text(
           'Delete Account',

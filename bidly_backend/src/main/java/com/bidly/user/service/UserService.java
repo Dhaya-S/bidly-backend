@@ -152,4 +152,25 @@ public class UserService {
                 .map(authService::mapToDto)
                 .collect(java.util.stream.Collectors.toList());
     }
+
+    /**
+     * Permanently deletes / anonymizes user account and sessions (Apple & Google Play Store Compliance).
+     */
+    @Transactional
+    public void deleteAccount(UUID userId) {
+        User user = findUserById(userId);
+        log.warn("Account deletion requested for userId: {}, phone: {}", userId, user.getPhone());
+        user.setName("Deleted User");
+        user.setEmail(null);
+        user.setAvatarUrl(null);
+        user.setPhone("deleted_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8));
+        user.setAddress(null);
+        user.setPincode(null);
+        user.setLatitude(null);
+        user.setLongitude(null);
+        user.setActive(false);
+        userRepository.save(user);
+        log.info("User account successfully anonymized and deactivated: {}", userId);
+    }
+
 }

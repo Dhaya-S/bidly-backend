@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_theme.dart';
 
 class NotificationPreferencesScreen extends StatefulWidget {
@@ -16,6 +17,31 @@ class _NotificationPreferencesScreenState extends State<NotificationPreferencesS
   bool _wishlist = false;
   bool _promotions = true;
   bool _news = false;
+  bool _isLoaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPreferences();
+  }
+
+  Future<void> _loadPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _messages = prefs.getBool('notif_messages') ?? true;
+      _bidUpdates = prefs.getBool('notif_bids') ?? true;
+      _orderUpdates = prefs.getBool('notif_orders') ?? true;
+      _wishlist = prefs.getBool('notif_wishlist') ?? false;
+      _promotions = prefs.getBool('notif_promotions') ?? true;
+      _news = prefs.getBool('notif_news') ?? false;
+      _isLoaded = true;
+    });
+  }
+
+  Future<void> _updatePref(String key, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(key, value);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +52,7 @@ class _NotificationPreferencesScreenState extends State<NotificationPreferencesS
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: AppTheme.textPrimary),
-          onPressed: () => context.pop(),
+          onPressed: () { if (Navigator.of(context).canPop()) { Navigator.of(context).pop(); } else if (context.canPop()) { context.pop(); } else { Navigator.of(context).maybePop(); } },
         ),
         title: const Text(
           'Notification Preferences',
@@ -73,7 +99,10 @@ class _NotificationPreferencesScreenState extends State<NotificationPreferencesS
                     _messages ? 'ON' : 'OFF',
                     Icons.chat_bubble_outline_rounded,
                     _messages,
-                    (v) => setState(() => _messages = v),
+                    (v) {
+                      setState(() => _messages = v);
+                      _updatePref('notif_messages', v);
+                    },
                   ),
                   const Divider(height: 1, indent: 60, endIndent: 16),
                   _buildToggleRow(
@@ -81,7 +110,10 @@ class _NotificationPreferencesScreenState extends State<NotificationPreferencesS
                     _bidUpdates ? 'ON' : 'OFF',
                     Icons.gavel_rounded,
                     _bidUpdates,
-                    (v) => setState(() => _bidUpdates = v),
+                    (v) {
+                      setState(() => _bidUpdates = v);
+                      _updatePref('notif_bids', v);
+                    },
                   ),
                   const Divider(height: 1, indent: 60, endIndent: 16),
                   _buildToggleRow(
@@ -89,7 +121,10 @@ class _NotificationPreferencesScreenState extends State<NotificationPreferencesS
                     _orderUpdates ? 'ON' : 'OFF',
                     Icons.inventory_2_outlined,
                     _orderUpdates,
-                    (v) => setState(() => _orderUpdates = v),
+                    (v) {
+                      setState(() => _orderUpdates = v);
+                      _updatePref('notif_orders', v);
+                    },
                   ),
                   const Divider(height: 1, indent: 60, endIndent: 16),
                   _buildToggleRow(
@@ -97,7 +132,10 @@ class _NotificationPreferencesScreenState extends State<NotificationPreferencesS
                     _wishlist ? 'ON' : 'OFF',
                     Icons.favorite_border_rounded,
                     _wishlist,
-                    (v) => setState(() => _wishlist = v),
+                    (v) {
+                      setState(() => _wishlist = v);
+                      _updatePref('notif_wishlist', v);
+                    },
                   ),
                   const Divider(height: 1, indent: 60, endIndent: 16),
                   _buildToggleRow(
@@ -105,7 +143,10 @@ class _NotificationPreferencesScreenState extends State<NotificationPreferencesS
                     _promotions ? 'ON' : 'OFF',
                     Icons.star_outline_rounded,
                     _promotions,
-                    (v) => setState(() => _promotions = v),
+                    (v) {
+                      setState(() => _promotions = v);
+                      _updatePref('notif_promotions', v);
+                    },
                   ),
                   const Divider(height: 1, indent: 60, endIndent: 16),
                   _buildToggleRow(
@@ -113,7 +154,10 @@ class _NotificationPreferencesScreenState extends State<NotificationPreferencesS
                     _news ? 'ON' : 'OFF',
                     Icons.notifications_none_rounded,
                     _news,
-                    (v) => setState(() => _news = v),
+                    (v) {
+                      setState(() => _news = v);
+                      _updatePref('notif_news', v);
+                    },
                   ),
                 ],
               ),

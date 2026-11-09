@@ -85,4 +85,14 @@ public class UserController {
         java.util.List<UserDto> users = userService.syncContacts(request);
         return ResponseEntity.ok(ApiResponse.success(users));
     }
+
+    /**
+     * DELETE /api/user/account — Delete and anonymize account (Apple & Google Play Store Compliance)
+     */
+    @DeleteMapping("/account")
+    public ResponseEntity<ApiResponse<Void>> deleteAccount(@AuthenticationPrincipal UUID userId) {
+        userService.deleteAccount(userId);
+        return ResponseEntity.ok(ApiResponse.success("Account deleted successfully", null));
+    }
+
 }

@@ -15,6 +15,10 @@ class IdentityProcessingScreen extends ConsumerStatefulWidget {
 
 class _IdentityProcessingScreenState extends ConsumerState<IdentityProcessingScreen> {
   int _step = 0; // 0: initial, 1: fetched aadhaar, 2: cross-checked, 3: trust score & done
+  Timer? _t1;
+  Timer? _t2;
+  Timer? _t3;
+  Timer? _t4;
 
   @override
   void initState() {
@@ -22,16 +26,25 @@ class _IdentityProcessingScreenState extends ConsumerState<IdentityProcessingScr
     _startVerificationSequence();
   }
 
+  @override
+  void dispose() {
+    _t1?.cancel();
+    _t2?.cancel();
+    _t3?.cancel();
+    _t4?.cancel();
+    super.dispose();
+  }
+
   void _startVerificationSequence() {
-    Timer(const Duration(milliseconds: 900), () {
+    _t1 = Timer(const Duration(milliseconds: 900), () {
       if (mounted) setState(() => _step = 1);
     });
 
-    Timer(const Duration(milliseconds: 1800), () {
+    _t2 = Timer(const Duration(milliseconds: 1800), () {
       if (mounted) setState(() => _step = 2);
     });
 
-    Timer(const Duration(milliseconds: 2700), () async {
+    _t3 = Timer(const Duration(milliseconds: 2700), () async {
       if (!mounted) return;
       setState(() => _step = 3);
 
@@ -39,12 +52,26 @@ class _IdentityProcessingScreenState extends ConsumerState<IdentityProcessingScr
       await ref.read(setupProvider.notifier).verifyDigiLocker();
 
       if (!mounted) return;
-      Timer(const Duration(milliseconds: 600), () {
+      _t4 = Timer(const Duration(milliseconds: 600), () {
         if (mounted) {
           context.go(AppRoutes.setupLocation);
         }
       });
     });
+  }
+
+  void _navigateBack() {
+    _t1?.cancel();
+    _t2?.cancel();
+    _t3?.cancel();
+    _t4?.cancel();
+    if (context.canPop()) {
+      context.pop();
+    } else if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      context.go(AppRoutes.setupIdentity);
+    }
   }
 
   @override
@@ -53,11 +80,32 @@ class _IdentityProcessingScreenState extends ConsumerState<IdentityProcessingScr
       backgroundColor: AppTheme.background,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 40.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // Top Back Button
+              Align(
+                alignment: Alignment.centerLeft,
+                child: GestureDetector(
+                  onTap: _navigateBack,
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppTheme.border, width: 1.2),
+                    ),
+                    child: const Icon(
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 16,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                ),
+              ),
               const Spacer(flex: 1),
 
               // Animated Circular Ring

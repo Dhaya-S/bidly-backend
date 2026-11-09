@@ -1,3 +1,4 @@
+﻿import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_theme.dart';
@@ -14,7 +15,7 @@ class ContactUsScreen extends StatelessWidget {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: AppTheme.textPrimary),
-          onPressed: () => context.pop(),
+          onPressed: () { if (Navigator.of(context).canPop()) { Navigator.of(context).pop(); } else if (context.canPop()) { context.pop(); } },
         ),
         title: const Text(
           'Contact Us',
@@ -74,10 +75,11 @@ class ContactUsScreen extends StatelessWidget {
                     child: SizedBox(
                       height: 50,
                       child: ElevatedButton.icon(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Dialing 1800-123-4567...')),
-                          );
+                        onPressed: () async {
+                          final uri = Uri.parse('tel:18001234567');
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri);
+                          }
                         },
                         icon: const Icon(Icons.phone_outlined, size: 18),
                         label: const Text('Call', style: TextStyle(fontFamily: 'Poppins', fontSize: 14, fontWeight: FontWeight.w600)),
@@ -95,10 +97,11 @@ class ContactUsScreen extends StatelessWidget {
                     child: SizedBox(
                       height: 50,
                       child: OutlinedButton.icon(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Opening email client for support@bidly.in...')),
-                          );
+                        onPressed: () async {
+                          final uri = Uri.parse('mailto:support@bidly.in?subject=Bidly%20Support%20Request');
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri);
+                          }
                         },
                         icon: const Icon(Icons.mail_outline_rounded, size: 18, color: Color(0xFF004E54)),
                         label: const Text('Email', style: TextStyle(fontFamily: 'Poppins', fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF004E54))),

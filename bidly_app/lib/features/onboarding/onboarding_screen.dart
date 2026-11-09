@@ -12,11 +12,55 @@ class OnboardingScreen extends StatelessWidget {
       backgroundColor: AppTheme.background,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 20.0),
+          padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 24),
+              // Top Bar with Back (if can pop) and Skip buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  if (Navigator.of(context).canPop() || context.canPop())
+                    GestureDetector(
+                      onTap: () {
+                        if (context.canPop()) {
+                          context.pop();
+                        } else if (Navigator.of(context).canPop()) {
+                          Navigator.of(context).pop();
+                        }
+                      },
+                      child: Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppTheme.border, width: 1.2),
+                        ),
+                        child: const Icon(
+                          Icons.arrow_back_ios_new_rounded,
+                          size: 16,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                    )
+                  else
+                    const SizedBox(width: 38),
+                  TextButton(
+                    onPressed: () => context.go(AppRoutes.phoneEntry),
+                    child: const Text(
+                      'Skip',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
 
               // Top Graphic Card
               Container(
@@ -34,7 +78,7 @@ class OnboardingScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
 
               // Main Title
               const Text(
@@ -47,7 +91,7 @@ class OnboardingScreen extends StatelessWidget {
                   letterSpacing: -0.5,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
 
               // Subtitle description
               const Text(
@@ -60,21 +104,21 @@ class OnboardingScreen extends StatelessWidget {
                   height: 1.5,
                 ),
               ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 32),
 
               // Feature 1: List Anything
               _buildFeatureItem(
                 title: 'List Anything',
                 description: 'Sell in minutes with smart forms',
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
               // Feature 2: Bid & Win
               _buildFeatureItem(
                 title: 'Bid & Win',
                 description: 'Get the best deals through live auctions',
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
 
               // Feature 3: Meet Safely
               _buildFeatureItem(

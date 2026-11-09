@@ -922,8 +922,8 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
 
                 const SizedBox(height: 18),
 
-                // 3. Deals Near You Section (Realtime backend items)
-                if (exploreState.searchQuery.isEmpty && exploreState.dealsNearYou.isNotEmpty) ...[
+                // 3. Deals Near You Section (Shown when "All" is active)
+                if (selectedCategory == 'All' && exploreState.searchQuery.isEmpty && exploreState.dealsNearYou.isNotEmpty) ...[
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: Row(
@@ -984,8 +984,8 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                   const SizedBox(height: 22),
                 ],
 
-                // 4. Top Sellers Section (Realtime backend sellers)
-                if (exploreState.searchQuery.isEmpty && exploreState.topSellers.isNotEmpty) ...[
+                // 4. Top Sellers Section (Shown when "All" is active)
+                if (selectedCategory == 'All' && exploreState.searchQuery.isEmpty && exploreState.topSellers.isNotEmpty) ...[
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: Row(
@@ -1032,8 +1032,8 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                   const SizedBox(height: 22),
                 ],
 
-                // 5. Recently Viewed Section (Realtime user viewed items)
-                if (exploreState.searchQuery.isEmpty && exploreState.recentlyViewed.isNotEmpty) ...[
+                // 5. Recently Viewed Section (Shown when "All" is active)
+                if (selectedCategory == 'All' && exploreState.searchQuery.isEmpty && exploreState.recentlyViewed.isNotEmpty) ...[
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: Row(
@@ -1086,15 +1086,48 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        selectedCategory != 'All' ? selectedCategory : 'Marketplace',
-                        style: const TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F172A),
-                          letterSpacing: -0.3,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            selectedCategory != 'All' ? selectedCategory : 'Marketplace',
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                              letterSpacing: -0.3,
+                            ),
+                          ),
+                          if (selectedCategory != 'All') ...[
+                            const SizedBox(width: 8),
+                            GestureDetector(
+                              onTap: () => ref.read(exploreProvider.notifier).selectCategory('All'),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFE2E8F0),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: const [
+                                    Text(
+                                      'Clear',
+                                      style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFF475569),
+                                      ),
+                                    ),
+                                    SizedBox(width: 3),
+                                    Icon(Icons.close_rounded, size: 12, color: Color(0xFF475569)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       Text(
                         '${exploreState.marketplaceListings.length} listings',
@@ -1133,11 +1166,26 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
                                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A)),
                                     ),
                                     const SizedBox(height: 4),
-                                    const Text(
-                                      'Try changing your category, filter, or search query.',
+                                    Text(
+                                      selectedCategory != 'All'
+                                          ? 'No items currently listed in "$selectedCategory". Tap Clear to view all items.'
+                                          : 'Try changing your filter or search query.',
                                       textAlign: TextAlign.center,
-                                      style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                                      style: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
                                     ),
+                                    if (selectedCategory != 'All') ...[
+                                      const SizedBox(height: 14),
+                                      ElevatedButton(
+                                        onPressed: () => ref.read(exploreProvider.notifier).selectCategory('All'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(0xFF004E54),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                                          elevation: 0,
+                                        ),
+                                        child: const Text('Show All Listings', style: TextStyle(color: Colors.white, fontFamily: 'Poppins', fontSize: 13, fontWeight: FontWeight.w600)),
+                                      ),
+                                    ],
                                     const SizedBox(height: 16),
                                     ElevatedButton(
                                       onPressed: () {

@@ -68,11 +68,10 @@ if ($env:JAVA_HOME -and (Test-Path "$env:JAVA_HOME\bin\java.exe")) {
     $javaBin = "$env:JAVA_HOME\bin\java.exe"
 }
 
-$jarPath = Join-Path $PSScriptRoot "build\libs\bidly-backend-0.0.1-SNAPSHOT.jar"
-if (Test-Path $jarPath) {
-    Write-Host "[INFO] Starting Bidly Backend (Standalone JAR) on port 8081..." -ForegroundColor Cyan
-    & $javaBin $jvmArgs -jar $jarPath
-} else {
-    Write-Host "[INFO] Starting Bidly Backend via Gradle on port 8081..." -ForegroundColor Cyan
-    .\gradlew.bat bootRun --no-daemon
+# Clean stale locked resources if present from previous runs
+if (Test-Path "$PSScriptRoot\build\resources\main") {
+    Remove-Item -Path "$PSScriptRoot\build\resources\main" -Recurse -Force -ErrorAction SilentlyContinue
 }
+
+Write-Host "[INFO] Starting Bidly Backend via Gradle on port 8081..." -ForegroundColor Cyan
+.\gradlew.bat bootRun --no-daemon

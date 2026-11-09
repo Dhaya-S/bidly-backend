@@ -83,8 +83,29 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                         log.info("[AUCTION_WS] CONNECT anonymous/viewer session: {}", accessor.getSessionId());
                     }
                 } else if (accessor != null && StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
+                    String destination = accessor.getDestination();
                     log.info("[AUCTION_WS] SUBSCRIBE destination: {} session: {}",
-                            accessor.getDestination(), accessor.getSessionId());
+                            destination, accessor.getSessionId());
+
+                    // Enforce strict authorization on private user channels
+                    if (destination != null && destination.startsWith("/topic/users/")) {
+                        String[] parts = destination.split("/");
+                        if (parts.length >= 4) {
+                            String targetUserId = parts[3];
+                            java.security.Principal principal = accessor.getUser();
+                            if (principal == null || !targetUserId.equalsIgnoreCase(principal.getName())) {
+                                log.warn("[AUCTION_WS] Blocked unauthorized subscription to {} by principal {}",
+                                        destination, principal != null ? principal.getName() : "anonymous");
+                                throw new org.springframework.security.access.AccessDeniedException("Unauthorized subscription to private channel");
+                            }
+                        }
+                    } else if (destination != null && destination.startsWith("/topic/chats/")) {
+                        java.security.Principal principal = accessor.getUser();
+                        if (principal == null) {
+                            log.warn("[AUCTION_WS] Blocked unauthenticated subscription to chat {}", destination);
+                            throw new org.springframework.security.access.AccessDeniedException("Authentication required to subscribe to chat room");
+                        }
+                    }
                 } else if (accessor != null && StompCommand.DISCONNECT.equals(accessor.getCommand())) {
                     log.info("[AUCTION_WS] DISCONNECT session: {}", accessor.getSessionId());
                 }

@@ -31,37 +31,35 @@ class ApiClient {
           handler.next(options);
         },
         onError: (error, handler) async {
-          if (error.response?.statusCode == 401) {
-            // Token expired — clear session
+          if (error.response?.statusCode == 401 || error.response?.statusCode == 403) {
+            // Token expired or access revoked — clear invalid session
             await clearToken();
           }
           handler.next(error);
         },
       ),
     );
-  }
 
-  static Dio _createDio() {
-    final dio = Dio(
-      BaseOptions(
-        baseUrl: _baseUrl,
-        connectTimeout: const Duration(seconds: 30),
-        sendTimeout: const Duration(minutes: 3),
-        receiveTimeout: const Duration(minutes: 3),
-      ),
-    );
-
-    // Only add logger in debug mode
+    // Add PrettyDioLogger AFTER auth interceptor so Authorization header is visible in debug logs
     assert(() {
-      dio.interceptors.add(PrettyDioLogger(
+      _dio.interceptors.add(PrettyDioLogger(
         requestHeader: true,
         requestBody: true,
         responseBody: true,
       ));
       return true;
     }());
+  }
 
-    return dio;
+  static Dio _createDio() {
+    return Dio(
+      BaseOptions(
+        baseUrl: _baseUrl,
+        connectTimeout: const Duration(seconds: 10),
+        sendTimeout: const Duration(minutes: 3),
+        receiveTimeout: const Duration(minutes: 3),
+      ),
+    );
   }
 
   Dio get dio => _dio;

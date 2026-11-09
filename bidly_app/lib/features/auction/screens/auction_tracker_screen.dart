@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -150,9 +150,11 @@ class _AuctionTrackerScreenState extends ConsumerState<AuctionTrackerScreen> {
                         children: [
                           Icon(sufficient ? Icons.check_circle_outline : Icons.error_outline, color: sufficient ? const Color(0xFF15803D) : const Color(0xFFB91C1C), size: 16),
                           const SizedBox(width: 6),
-                          Text(
-                            sufficient ? 'Wallet has sufficient available funds' : 'Insufficient available funds',
-                            style: TextStyle(fontFamily: 'Poppins', fontSize: 12.5, fontWeight: FontWeight.w700, color: sufficient ? const Color(0xFF15803D) : const Color(0xFFB91C1C)),
+                          Expanded(
+                            child: Text(
+                              sufficient ? 'Wallet balance sufficient' : 'Amount not in wallet. Top up your wallet.',
+                              style: TextStyle(fontFamily: 'Poppins', fontSize: 12.5, fontWeight: FontWeight.w700, color: sufficient ? const Color(0xFF15803D) : const Color(0xFFB91C1C)),
+                            ),
                           ),
                         ],
                       ),
@@ -186,51 +188,71 @@ class _AuctionTrackerScreenState extends ConsumerState<AuctionTrackerScreen> {
 
                 const SizedBox(height: 20),
 
-                // Confirm Increase CTA
+                // Confirm Increase CTA or Top Up CTA
                 SizedBox(
                   width: double.infinity,
                   height: 48,
-                  child: ElevatedButton(
-                    onPressed: (sufficient && !isPlacing)
-                        ? () async {
-                            setModalState(() {
-                              isPlacing = true;
-                              modalError = null;
+                  child: sufficient
+                      ? ElevatedButton(
+                          onPressed: !isPlacing
+                              ? () async {
+                                  setModalState(() {
+                                    isPlacing = true;
+                                    modalError = null;
+                                  });
+
+                                  final success = await ref.read(auctionProvider.notifier).placeBid(widget.listingId, newAmount);
+
+                                  if (!ctx.mounted) return;
+
+                                  if (success) {
+                                    Navigator.pop(ctx);
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Bid increased to ${currencyFormatter.format(newAmount)}!'),
+                                          backgroundColor: const Color(0xFF10B981),
+                                        ),
+                                      );
+                                    }
+                                  } else {
+                                    final err = ref.read(auctionProvider).errorMessage ?? 'Failed to place bid. Please try again.';
+                                    setModalState(() {
+                                      isPlacing = false;
+                                      modalError = err;
+                                    });
+                                  }
+                                }
+                              : null,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF004E54),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: isPlacing
+                              ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                              : Text('Confirm • ${currencyFormatter.format(newAmount)}', style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800, fontSize: 15)),
+                        )
+                      : ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            context.push('/wallet/add-money').then((_) {
+                              ref.read(auctionProvider.notifier).fetchWallet();
                             });
-
-                            final success = await ref.read(auctionProvider.notifier).placeBid(widget.listingId, newAmount);
-
-                            if (!ctx.mounted) return;
-
-                            if (success) {
-                              Navigator.pop(ctx);
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Bid increased to ${currencyFormatter.format(newAmount)}!'),
-                                    backgroundColor: const Color(0xFF10B981),
-                                  ),
-                                );
-                              }
-                            } else {
-                              final err = ref.read(auctionProvider).errorMessage ?? 'Failed to place bid. Please try again.';
-                              setModalState(() {
-                                isPlacing = false;
-                                modalError = err;
-                              });
-                            }
-                          }
-                        : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF004E54),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: isPlacing
-                        ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                        : Text('Confirm • ${currencyFormatter.format(newAmount)}', style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w800, fontSize: 15)),
-                  ),
+                          },
+                          icon: const Icon(Icons.add_circle_outline, size: 18),
+                          label: Text(
+                            'Amount not in wallet • Top Up ₹${(additionalNeeded - availableBalance).ceil()}',
+                            style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700, fontSize: 13.5),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFF59E0B),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
                 ),
               ],
             ),
@@ -430,7 +452,7 @@ class _AuctionTrackerScreenState extends ConsumerState<AuctionTrackerScreen> {
         elevation: 0.5,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-          onPressed: () => context.pop(),
+          onPressed: () { if (Navigator.of(context).canPop()) { Navigator.of(context).pop(); } else if (context.canPop()) { context.pop(); } },
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

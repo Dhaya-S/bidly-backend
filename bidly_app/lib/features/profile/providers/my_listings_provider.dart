@@ -1,3 +1,4 @@
+import '../../auth/providers/auth_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
 
@@ -132,12 +133,20 @@ class MyListingsState {
 
 class MyListingsNotifier extends StateNotifier<MyListingsState> {
   final ApiClient _apiClient;
+  final String? _userId;
 
-  MyListingsNotifier(this._apiClient) : super(const MyListingsState()) {
-    fetchMyListings();
+  MyListingsNotifier(this._apiClient, this._userId) : super(const MyListingsState()) {
+    if (_userId != null && _userId.isNotEmpty) {
+      fetchMyListings();
+    }
   }
 
   Future<void> fetchMyListings() async {
+    final token = await _apiClient.getToken();
+    if (token == null || token.isEmpty || _userId == null || _userId.isEmpty) {
+      state = const MyListingsState();
+      return;
+    }
     state = state.copyWith(isLoading: true);
     try {
       final res = await _apiClient.get('/listings/my');
@@ -186,10 +195,15 @@ class MyListingsNotifier extends StateNotifier<MyListingsState> {
   void setFilter(String filter) {
     state = state.copyWith(selectedFilter: filter);
   }
+
+  void clear() {
+    state = const MyListingsState();
+  }
 }
 
 final myListingsProvider =
     StateNotifierProvider<MyListingsNotifier, MyListingsState>((ref) {
   final apiClient = ref.watch(apiClientProvider);
-  return MyListingsNotifier(apiClient);
+  final userId = ref.watch(authProvider.select((s) => s.user?.id));
+  return MyListingsNotifier(apiClient, userId);
 });

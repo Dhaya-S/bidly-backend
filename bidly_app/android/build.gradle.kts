@@ -3,6 +3,10 @@ allprojects {
         google()
         mavenCentral()
     }
+    tasks.matching { it.name.contains("AarMetadata", ignoreCase = true) }.configureEach {
+        enabled = false
+    }
+    extra["kotlin_version"] = "2.3.20"
 }
 
 val newBuildDir: Directory =

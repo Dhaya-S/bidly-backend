@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../core/widgets/bidly_logo.dart';
+import '../../../core/widgets/bidly_snackbar.dart';
 import '../models/auth_state.dart';
 import '../providers/auth_provider.dart';
 
@@ -59,11 +60,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       context.push(AppRoutes.otpVerify);
     } else {
       final error = ref.read(authProvider).errorMessage ?? 'Failed to send verification code';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error),
-          backgroundColor: AppTheme.error,
-        ),
+      BidlySnackBar.show(
+        context: context,
+        message: error,
+        icon: Icons.info_outline_rounded,
       );
     }
   }
@@ -78,8 +78,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
-              child: Form(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+            child: Form(
               key: _formKey,
               autovalidateMode: AutovalidateMode.onUserInteraction,
               child: Column(

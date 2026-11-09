@@ -27,12 +27,26 @@ class ExploreState {
   final bool hasMore;
   final DateTime? lastUpdated;
 
+  static const List<String> defaultCategories = [
+    'All',
+    'Vehicles',
+    'Smartphones',
+    'Electronics',
+    'Computers',
+    'Gaming',
+    'Cameras',
+    'Fashion',
+    'Furniture',
+    'Books',
+    'Sports',
+  ];
+
   const ExploreState({
     this.isLoading = false,
     this.isRefreshing = false,
     this.isLoadingMore = false,
     this.errorMessage,
-    this.categories = const ['All'],
+    this.categories = defaultCategories,
     this.selectedCategory = 'All',
     this.selectedSellingMethod = 'ALL',
     this.sortBy = 'relevance',
@@ -197,16 +211,29 @@ class ExploreNotifier extends StateNotifier<ExploreState> {
       }
     }).catchError((_) {});
 
-    // 5. Fetch Dynamic Categories from API
+    // 5. Fetch Dynamic Categories from API & merge with standard catalog
     _apiClient.dio.get('/categories').then((res) {
       if (res.data != null && res.data['success'] == true) {
         final list = res.data['data'] as List;
         final catNames = list
             .map((j) => (j['name'] as String?)?.trim() ?? '')
             .where((name) => name.isNotEmpty)
-            .toSet()
             .toList();
-        state = state.copyWith(categories: ['All', ...catNames]);
+        final ordered = <String>{
+          'All',
+          'Vehicles',
+          'Smartphones',
+          'Electronics',
+          'Computers',
+          'Gaming',
+          'Cameras',
+          'Fashion',
+          'Furniture',
+          'Books',
+          'Sports',
+          ...catNames
+        }.toList();
+        state = state.copyWith(categories: ordered);
       }
     }).catchError((_) {});
   }
@@ -279,7 +306,7 @@ class ExploreNotifier extends StateNotifier<ExploreState> {
 
   void selectCategory(String category) {
     if (state.selectedCategory == category) return;
-    state = state.copyWith(selectedCategory: category);
+    state = state.copyWith(selectedCategory: category, currentPage: 0, hasMore: true);
     fetchExploreData(isRefresh: true);
   }
 

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -258,7 +258,7 @@ class _PlaceBidScreenState extends ConsumerState<PlaceBidScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  sufficient ? 'Ready to place your bid' : 'Insufficient balance',
+                  sufficient ? 'Ready to place your bid' : 'Amount not in wallet. Top up your wallet.',
                   style: const TextStyle(fontFamily: 'Poppins', fontSize: 12.5, color: Color(0xFF64748B)),
                 ),
                 const SizedBox(height: 20),
@@ -316,7 +316,7 @@ class _PlaceBidScreenState extends ConsumerState<PlaceBidScreen> {
                     child: Text(
                       sufficient
                           ? 'Your wallet has enough funds to place this bid'
-                          : 'Short by ${currencyFormatter.format(shortAmount)} - Please top up to continue',
+                          : 'Amount not in wallet (Short by ${currencyFormatter.format(shortAmount)}). Top up your wallet to continue.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontFamily: 'Poppins',
@@ -455,6 +455,9 @@ class _PlaceBidScreenState extends ConsumerState<PlaceBidScreen> {
     final platformFee = currentBid * 0.02;
     final totalPayable = currentBid + platformFee;
     final selectedAddress = state.selectedAddress;
+    final wallet = state.wallet;
+    final availableBalance = wallet?.availableBalance ?? 0.0;
+    final isSufficient = availableBalance >= currentBid;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -464,7 +467,7 @@ class _PlaceBidScreenState extends ConsumerState<PlaceBidScreen> {
         elevation: 0.5,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-          onPressed: () => context.pop(),
+          onPressed: () { if (Navigator.of(context).canPop()) { Navigator.of(context).pop(); } else if (context.canPop()) { context.pop(); } },
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -589,6 +592,89 @@ class _PlaceBidScreenState extends ConsumerState<PlaceBidScreen> {
                         'Minimum bid: ${currencyFormatter.format(minBid)}',
                         style: const TextStyle(fontFamily: 'Poppins', fontSize: 12, color: Color(0xFF64748B)),
                       ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Real-time Wallet Balance & Top-up prompt
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isSufficient ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: isSufficient ? const Color(0xFFBBF7D0) : const Color(0xFFFECACA),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Icon(
+                              isSufficient ? Icons.account_balance_wallet_rounded : Icons.warning_amber_rounded,
+                              color: isSufficient ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                              size: 22,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Text(
+                                        'Wallet Balance: ',
+                                        style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: Color(0xFF64748B)),
+                                      ),
+                                      Text(
+                                        currencyFormatter.format(availableBalance),
+                                        style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                          color: isSufficient ? const Color(0xFF15803D) : const Color(0xFFDC2626),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    isSufficient
+                                        ? '✓ Realtime funds ready for bid'
+                                        : 'Amount not in wallet. Top up your wallet.',
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: isSufficient ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (!isSufficient)
+                        TextButton(
+                          onPressed: () async {
+                            final shortAmt = (currentBid > availableBalance) ? (currentBid - availableBalance) : 500.0;
+                            await context.push('/wallet/add-money?minTopUp=${shortAmt.toInt()}');
+                            if (mounted) {
+                              await ref.read(auctionProvider.notifier).fetchWallet();
+                            }
+                          },
+                          style: TextButton.styleFrom(
+                            backgroundColor: const Color(0xFFDC2626),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: const Text('Top Up', style: TextStyle(fontFamily: 'Poppins', fontSize: 12, fontWeight: FontWeight.w700)),
+                        ),
                     ],
                   ),
                 ),

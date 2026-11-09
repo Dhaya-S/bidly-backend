@@ -1,3 +1,7 @@
+﻿import '../../profile/screens/report_problem_screen.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../providers/chat_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -41,6 +45,28 @@ class ChatDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
+  Future<void> _pickAndSendImage() async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+      if (picked != null && mounted) {
+        await ref.read(chatRoomNotifierProvider.notifier).initRoomById(
+          widget.thread.id,
+          listingId: widget.thread.listingId,
+        );
+        await ref.read(chatRoomNotifierProvider.notifier).sendImageMessage(
+          filePath: picked.path,
+        );
+        _fetchMessages();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to select image: $e')),
+        );
+      }
+    }
+  }
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   late List<ChatMessageItem> _messages;
@@ -177,7 +203,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         leadingWidth: 40,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: AppTheme.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () { if (Navigator.of(context).canPop()) { Navigator.of(context).pop(); } else if (context.canPop()) { context.pop(); } },
         ),
         title: Row(
           children: [
@@ -248,15 +274,44 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.call_outlined, color: AppTheme.textPrimary, size: 22),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Starting encrypted in-app voice call...')),
-              );
+            onPressed: () async {
+              final uri = Uri.parse('tel:');
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri);
+              }
             },
           ),
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded, color: AppTheme.textPrimary, size: 22),
-            onPressed: () {},
+            onSelected: (val) {
+              if (val == 'listing' && widget.thread.listingId.isNotEmpty) {
+                context.push('/listing/${widget.thread.listingId}');
+              } else if (val == 'report') {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportProblemScreen()));
+              } else if (val == 'safety') {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Safety Guidelines', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w700)),
+                    content: const Text(
+                      '• Meet in a public, well-lit place.\n'
+                      '• Inspect the item thoroughly before sharing delivery OTP.\n'
+                      '• Never pay outside the Bidly escrow system.',
+                      style: TextStyle(fontFamily: 'Poppins', fontSize: 13, height: 1.5),
+                    ),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Understood')),
+                    ],
+                  ),
+                );
+              }
+            },
+            itemBuilder: (ctx) => [
+              if (widget.thread.listingId.isNotEmpty)
+                const PopupMenuItem(value: 'listing', child: Text('View Item Listing')),
+              const PopupMenuItem(value: 'report', child: Text('Report User')),
+              const PopupMenuItem(value: 'safety', child: Text('Safety Guidelines')),
+            ],
           ),
         ],
         bottom: PreferredSize(
@@ -447,7 +502,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.image_outlined, color: AppTheme.textSecondary, size: 24),
-                    onPressed: () {},
+                    onPressed: _pickAndSendImage,
                   ),
                   Expanded(
                     child: Container(

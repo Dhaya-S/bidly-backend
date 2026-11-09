@@ -46,18 +46,22 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> with WidgetsBin
   void _onHorizontalScroll() {
     if (!_horizontalTabController.hasClients || _horizontalTabController.page == null) return;
     final page = _horizontalTabController.page!;
-    if ((page - _horizontalScrollOffset).abs() > 0.001) {
+    if ((page - _horizontalScrollOffset).abs() > 0.005) {
       setState(() {
         _horizontalScrollOffset = page.clamp(0.0, 1.0);
       });
     }
     // Instantly pause video reels when swiping away from Feed towards Posts (> 0.05)
     if (page > 0.05) {
-      ReelsControllerManager().pauseAll();
+      if (!ReelsControllerManager().isPaused) {
+        ReelsControllerManager().pauseAll();
+      }
     } else if (page <= 0.02 && ref.read(reelsProvider).activeTab == 0) {
       final selectedNavIndex = ref.read(selectedNavIndexProvider);
       if (selectedNavIndex == 0 && ModalRoute.of(context)?.isCurrent == true) {
-        ReelsControllerManager().resumeCurrent();
+        if (ReelsControllerManager().isPaused) {
+          ReelsControllerManager().resumeCurrent();
+        }
       }
     }
   }
@@ -68,19 +72,31 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> with WidgetsBin
       ref.read(postsProvider.notifier).setActiveTab(0);
       final selectedNavIndex = ref.read(selectedNavIndexProvider);
       if (selectedNavIndex == 0 && ModalRoute.of(context)?.isCurrent == true) {
-        ReelsControllerManager().resumeCurrent();
+        if (ReelsControllerManager().isPaused) {
+          ReelsControllerManager().resumeCurrent();
+        }
       }
     } else {
       ref.read(reelsProvider.notifier).setActiveTab(1);
       ref.read(postsProvider.notifier).setActiveTab(1);
-      ReelsControllerManager().pauseAll();
+      if (!ReelsControllerManager().isPaused) {
+        ReelsControllerManager().pauseAll();
+      }
     }
   }
 
   void _switchToTab(int index) {
     if (!_horizontalTabController.hasClients) return;
+    ref.read(reelsProvider.notifier).setActiveTab(index);
+    ref.read(postsProvider.notifier).setActiveTab(index);
     if (index == 1) {
-      ReelsControllerManager().pauseAll();
+      if (!ReelsControllerManager().isPaused) {
+        ReelsControllerManager().pauseAll();
+      }
+    } else {
+      if (ReelsControllerManager().isPaused) {
+        ReelsControllerManager().resumeCurrent();
+      }
     }
     _horizontalTabController.animateToPage(
       index,
@@ -225,7 +241,7 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> with WidgetsBin
                                     listing: reelsState.reelListings[index],
                                     itemIndex: index,
                                     activeNotifier: _activeReelNotifier,
-                                    isHomeVisible: isHomeVisible && t < 0.1 && reelsState.activeTab == 0,
+                                    isHomeVisible: isHomeVisible && t < 0.5,
                                   );
                                 },
                               ),
@@ -554,7 +570,7 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> with WidgetsBin
     );
   }
 
-  Widget _buildEmptyReelsState() {
+  Widget _buildEmptyReelsState([String? errorMessage]) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32.0),
@@ -568,16 +584,16 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> with WidgetsBin
                 color: Color(0xFF1E232A),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.video_library_outlined,
+              child: Icon(
+                errorMessage != null ? Icons.cloud_off_rounded : Icons.video_library_outlined,
                 size: 36,
-                color: Color(0xFF004E54),
+                color: errorMessage != null ? const Color(0xFFEF4444) : const Color(0xFF004E54),
               ),
             ),
             const SizedBox(height: 18),
-            const Text(
-              'No Video Reels Available',
-              style: TextStyle(
+            Text(
+              errorMessage != null ? 'Unable to Load Feed' : 'No Video Reels Available',
+              style: const TextStyle(
                 fontFamily: 'Poppins',
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
@@ -585,10 +601,10 @@ class _HomeFeedScreenState extends ConsumerState<HomeFeedScreen> with WidgetsBin
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'When users list products with reels or videos, they appear here!',
+            Text(
+              errorMessage ?? 'When users list products with reels or videos, they appear here!',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontFamily: 'Poppins',
                 fontSize: 13,
                 color: Color(0xFF94A3B8),

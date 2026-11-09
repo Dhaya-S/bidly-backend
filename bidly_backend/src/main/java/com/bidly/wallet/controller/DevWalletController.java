@@ -18,7 +18,7 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/dev/wallet")
-@ConditionalOnProperty(prefix = "bidly.dev-wallet", name = "enabled", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(prefix = "bidly.dev-wallet", name = "enabled", havingValue = "true", matchIfMissing = false)
 public class DevWalletController {
 
     private final WalletService walletService;

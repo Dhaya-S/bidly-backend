@@ -1,3 +1,4 @@
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_theme.dart';
@@ -12,6 +13,8 @@ class ReportProblemScreen extends StatefulWidget {
 class _ReportProblemScreenState extends State<ReportProblemScreen> {
   String? _selectedIssueType = 'Payment / Wallet Issue';
   final _descriptionController = TextEditingController();
+  XFile? _selectedScreenshot;
+
   final List<String> _issueTypes = [
     'Payment / Wallet Issue',
     'Auction / Bidding Dispute',
@@ -25,6 +28,18 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   void dispose() {
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickScreenshot() async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
+      if (picked != null && mounted) {
+        setState(() {
+          _selectedScreenshot = picked;
+        });
+      }
+    } catch (_) {}
   }
 
   void _handleSubmit() {
@@ -41,7 +56,11 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
         backgroundColor: AppTheme.success,
       ),
     );
-    context.pop();
+    if (context.canPop()) {
+      context.pop();
+    } else if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
   }
 
   @override
@@ -53,7 +72,13 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: AppTheme.textPrimary),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else if (context.canPop()) {
+              context.pop();
+            }
+          },
         ),
         title: const Text(
           'Report a Problem',
@@ -148,43 +173,54 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               ),
               const SizedBox(height: 6),
               GestureDetector(
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Selecting image from gallery...')),
-                  );
-                },
+                onTap: _pickScreenshot,
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 24),
+                  padding: const EdgeInsets.symmetric(vertical: 20),
                   decoration: BoxDecoration(
                     color: const Color(0xFFF9FAFB),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppTheme.border),
+                    border: Border.all(color: _selectedScreenshot != null ? const Color(0xFF10B981) : AppTheme.border),
                   ),
-                  child: Column(
-                    children: const [
-                      Icon(Icons.upload_outlined, size: 28, color: Color(0xFF004E54)),
-                      SizedBox(height: 8),
-                      Text(
-                        'Tap to upload screenshot',
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textPrimary,
+                  child: _selectedScreenshot != null
+                      ? Column(
+                          children: [
+                            const Icon(Icons.check_circle_outline, size: 32, color: Color(0xFF10B981)),
+                            const SizedBox(height: 6),
+                            Text(
+                              _selectedScreenshot!.name,
+                              style: const TextStyle(fontFamily: 'Poppins', fontSize: 12.5, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            const Text('Tap to change image', style: TextStyle(fontFamily: 'Poppins', fontSize: 11, color: Color(0xFF10B981))),
+                          ],
+                        )
+                      : Column(
+                          children: const [
+                            Icon(Icons.upload_outlined, size: 28, color: Color(0xFF004E54)),
+                            SizedBox(height: 8),
+                            Text(
+                              'Tap to upload screenshot',
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'PNG, JPG up to 5MB',
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 11,
+                                color: AppTheme.textSecondary,
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      SizedBox(height: 2),
-                      Text(
-                        'PNG, JPG up to 5MB',
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 11,
-                          color: AppTheme.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
               ),
               const SizedBox(height: 32),

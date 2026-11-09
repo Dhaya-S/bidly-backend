@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
@@ -157,105 +157,142 @@ class _CreateCommunityScreenState extends ConsumerState<CreateCommunityScreen> {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(20),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Select Community Location',
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
+      builder: (ctx) => SafeArea(
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.8,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Drag Handle & Title Bar (pinned)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 12, 4),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFCBD5E1),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Select Community Location',
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close_rounded, color: AppTheme.textSecondary),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: Color(0xFFF1F5F9)),
+
+              // Scrollable Options List
+              Flexible(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Live GPS button
+                      ListTile(
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          _detectCurrentLocation();
+                        },
+                        leading: Container(
+                          width: 38,
+                          height: 38,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE6F4F1),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.my_location_rounded, color: Color(0xFF004E54), size: 20),
+                        ),
+                        title: const Text(
+                          'Use Current GPS Location',
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF004E54),
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Accurately detects your coordinates',
+                          style: TextStyle(fontFamily: 'Poppins', fontSize: 11.5, color: AppTheme.textSecondary),
+                        ),
+                      ),
+                      const Divider(height: 16, color: Color(0xFFF1F5F9)),
+
+                      const Text(
+                        'Popular Chennai Localities',
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      ...popularLocations.map((loc) {
+                        return ListTile(
+                          dense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                          leading: const Icon(Icons.location_on_outlined, color: Color(0xFF004E54), size: 20),
+                          title: Text(
+                            loc['name'] as String,
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              color: AppTheme.textPrimary,
+                            ),
+                          ),
+                          onTap: () {
+                            setState(() {
+                              _locationController.text = loc['name'] as String;
+                              _latitude = loc['lat'] as double;
+                              _longitude = loc['lng'] as double;
+                            });
+                            Navigator.pop(ctx);
+                          },
+                        );
+                      }),
+                    ],
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded, color: AppTheme.textSecondary),
-                  onPressed: () => Navigator.pop(ctx),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            // Live GPS button
-            ListTile(
-              onTap: () {
-                Navigator.pop(ctx);
-                _detectCurrentLocation();
-              },
-              leading: Container(
-                width: 38,
-                height: 38,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE6F4F1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.my_location_rounded, color: Color(0xFF004E54), size: 20),
               ),
-              title: const Text(
-                'Use Current GPS Location',
-                style: TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF004E54),
-                ),
-              ),
-              subtitle: const Text(
-                'Accurately detects your coordinates',
-                style: TextStyle(fontFamily: 'Poppins', fontSize: 11.5, color: AppTheme.textSecondary),
-              ),
-            ),
-            const Divider(height: 16, color: Color(0xFFF1F5F9)),
-
-            const Text(
-              'Popular Chennai Localities',
-              style: TextStyle(
-                fontFamily: 'Poppins',
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            ...popularLocations.map((loc) {
-              return ListTile(
-                dense: true,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                leading: const Icon(Icons.location_on_outlined, color: Color(0xFF004E54), size: 20),
-                title: Text(
-                  loc['name'] as String,
-                  style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                onTap: () {
-                  setState(() {
-                    _locationController.text = loc['name'] as String;
-                    _latitude = loc['lat'] as double;
-                    _longitude = loc['lng'] as double;
-                  });
-                  Navigator.pop(ctx);
-                },
-              );
-            }),
-            const SizedBox(height: 12),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -306,7 +343,7 @@ class _CreateCommunityScreenState extends ConsumerState<CreateCommunityScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: AppTheme.textPrimary),
-          onPressed: () => context.pop(),
+          onPressed: () { if (Navigator.of(context).canPop()) { Navigator.of(context).pop(); } else if (context.canPop()) { context.pop(); } },
         ),
         title: const Text(
           'Create Community',

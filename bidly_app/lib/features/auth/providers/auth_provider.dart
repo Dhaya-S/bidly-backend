@@ -1,3 +1,9 @@
+import '../../profile/providers/wishlist_provider.dart';
+import '../../profile/providers/orders_provider.dart';
+import '../../profile/providers/my_listings_provider.dart';
+import '../../profile/providers/wallet_provider.dart';
+import '../../profile/providers/notifications_provider.dart';
+import '../../chat/providers/chat_provider.dart';
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,8 +13,9 @@ import '../models/user_model.dart';
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final ApiClient _apiClient;
+  final Ref _ref;
 
-  AuthNotifier(this._apiClient) : super(const AuthState()) {
+  AuthNotifier(this._apiClient, this._ref) : super(const AuthState()) {
     checkAuthStatus();
   }
 
@@ -50,10 +57,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
       }
     } on DioException catch (e) {
-      if (e.response?.statusCode == 401) {
+      if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
         // Token is explicitly expired or invalid
         await _apiClient.clearToken();
         state = const AuthState(status: AuthStatus.unauthenticated);
+        _invalidateUserData();
       }
       // On network timeout or connection issues, keep user logged in with cached session
     } catch (_) {
@@ -81,6 +89,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           'mobile': normalizedPhone,
           'name': name?.trim(),
           'signUp': isSignUp,
+          'isSignUp': isSignUp,
         },
       );
 
@@ -160,6 +169,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           pendingName: null,
           pendingRequestId: null,
         );
+        _invalidateUserData();
         return true;
       } else {
         final msg = response.data?['message'] as String? ?? 'Invalid OTP code';
@@ -219,6 +229,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     await _apiClient.clearToken();
     state = const AuthState(status: AuthStatus.unauthenticated);
+    _invalidateUserData();
+  }
+
+  void _invalidateUserData() {
+    try {
+      _ref.invalidate(wishlistProvider);
+      _ref.invalidate(chatRoomListProvider);
+      _ref.invalidate(ordersProvider);
+      _ref.invalidate(myListingsProvider);
+      _ref.invalidate(walletProvider);
+      _ref.invalidate(notificationsProvider);
+    } catch (_) {}
   }
 
   String _extractErrorMessage(DioException e, String fallback) {
@@ -239,5 +261,5 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final apiClient = ref.watch(apiClientProvider);
-  return AuthNotifier(apiClient);
+  return AuthNotifier(apiClient, ref);
 });

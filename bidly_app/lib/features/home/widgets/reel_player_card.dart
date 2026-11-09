@@ -6,6 +6,10 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../../core/widgets/bidly_snackbar.dart';
+import '../../auth/models/auth_state.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../explore/models/listing_model.dart';
 import '../providers/reels_provider.dart';
 import '../services/reels_controller_manager.dart';
@@ -36,6 +40,7 @@ class _ReelPlayerCardState extends ConsumerState<ReelPlayerCard>
   bool _isInitializing = false;
   bool _initFailed = false;
   bool _isMuted = false;
+  bool _isDescriptionExpanded = false;
   late int _bidsCount;
 
   // Instagram Heart Animation Controller
@@ -109,6 +114,9 @@ class _ReelPlayerCardState extends ConsumerState<ReelPlayerCard>
       oldWidget.activeNotifier.removeListener(_onActiveIndexChanged);
       widget.activeNotifier.addListener(_onActiveIndexChanged);
     }
+    if (widget.listing.id != oldWidget.listing.id) {
+      _isDescriptionExpanded = false;
+    }
     if (widget.listing.id != oldWidget.listing.id || widget.isHomeVisible != oldWidget.isHomeVisible) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -120,6 +128,9 @@ class _ReelPlayerCardState extends ConsumerState<ReelPlayerCard>
 
   void _onActiveIndexChanged() {
     if (mounted) {
+      if (widget.itemIndex != widget.activeNotifier.value && _isDescriptionExpanded) {
+        setState(() => _isDescriptionExpanded = false);
+      }
       _checkPlaybackState(widget.activeNotifier.value);
     }
   }
@@ -300,7 +311,22 @@ class _ReelPlayerCardState extends ConsumerState<ReelPlayerCard>
     });
   }
 
+  bool _ensureAuthenticated() {
+    final authState = ref.read(authProvider);
+    if (authState.status != AuthStatus.authenticated || authState.user == null) {
+      BidlySnackBar.show(
+        context: context,
+        message: 'Please sign in to like reels',
+        icon: Icons.favorite_border_rounded,
+      );
+      context.push(AppRoutes.login);
+      return false;
+    }
+    return true;
+  }
+
   void _toggleLike() {
+    if (!_ensureAuthenticated()) return;
     final reelsState = ref.read(reelsProvider);
     final isCurrentlyLiked = reelsState.isLiked(widget.listing.id, widget.listing.isLikedByMe);
     final nextState = !isCurrentlyLiked;
@@ -320,6 +346,7 @@ class _ReelPlayerCardState extends ConsumerState<ReelPlayerCard>
   }
 
   void _handleDoubleTap() {
+    if (!_ensureAuthenticated()) return;
     HapticFeedback.mediumImpact();
     _triggerHeartBurst();
     _likeButtonAnimController.forward(from: 0.0);
@@ -588,7 +615,7 @@ class _ReelPlayerCardState extends ConsumerState<ReelPlayerCard>
         // 5. Right Action Column (Likes, Share, Mute)
         Positioned(
           right: 16,
-          bottom: isAuction ? 170 : 130,
+          bottom: isAuction ? 275 : 215,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -685,114 +712,205 @@ class _ReelPlayerCardState extends ConsumerState<ReelPlayerCard>
             mainAxisSize: MainAxisSize.min,
             children: [
               // Seller Info Row
-              GestureDetector(
-                onTap: () async {
-                  ReelsControllerManager().pauseAll();
-                  await context.push('/listing/${widget.listing.id}', extra: widget.listing);
-                  if (context.mounted && widget.isHomeVisible && ModalRoute.of(context)?.isCurrent == true) {
-                    ReelsControllerManager().resumeCurrent();
-                  }
-                },
-                behavior: HitTestBehavior.opaque,
-                child: Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF004E54),
-                        shape: BoxShape.circle,
+              Padding(
+                padding: const EdgeInsets.only(right: 64),
+                child: GestureDetector(
+                  onTap: () async {
+                    ReelsControllerManager().pauseAll();
+                    await context.push('/listing/${widget.listing.id}', extra: widget.listing);
+                    if (context.mounted && widget.isHomeVisible && ModalRoute.of(context)?.isCurrent == true) {
+                      ReelsControllerManager().resumeCurrent();
+                    }
+                  },
+                  behavior: HitTestBehavior.opaque,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF004E54),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Center(
+                          child: Text(
+                            _getSellerInitials(),
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
                       ),
-                      child: Center(
+                      const SizedBox(width: 10),
+                      Flexible(
                         child: Text(
-                          _getSellerInitials(),
+                          _getSellerName(),
                           style: const TextStyle(
                             fontFamily: 'Poppins',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
                             color: Colors.white,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Flexible(
-                      child: Text(
-                        _getSellerName(),
-                        style: const TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (_getLocationText() != null) ...[
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF004E54),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.location_on_outlined, color: Colors.white70, size: 11),
-                              const SizedBox(width: 3),
-                              Flexible(
-                                child: Text(
-                                  _getLocationText()!,
-                                  style: const TextStyle(
-                                    fontFamily: 'Poppins',
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
+                      if (_getLocationText() != null) ...[
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF004E54),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.location_on_outlined, color: Colors.white70, size: 11),
+                                const SizedBox(width: 3),
+                                Flexible(
+                                  child: Text(
+                                    _getLocationText()!,
+                                    style: const TextStyle(
+                                      fontFamily: 'Poppins',
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
               const SizedBox(height: 8),
 
               // Title
-              Text(
-                widget.listing.title,
-                style: const TextStyle(
-                  fontFamily: 'Poppins',
-                  fontSize: 15.5,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 3),
-
-              // Description snippet (only if available)
-              if (widget.listing.description != null && widget.listing.description!.trim().isNotEmpty) ...[
-                Text(
-                  widget.listing.description!.trim(),
-                  style: TextStyle(
+              Padding(
+                padding: const EdgeInsets.only(right: 64),
+                child: Text(
+                  widget.listing.title,
+                  style: const TextStyle(
                     fontFamily: 'Poppins',
-                    fontSize: 12.5,
-                    color: Colors.white.withValues(alpha: 0.85),
+                    fontSize: 15.5,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 10),
+              ),
+              const SizedBox(height: 3),
+
+              // Description snippet with "see more" / "show less" option
+              if (widget.listing.description != null && widget.listing.description!.trim().isNotEmpty) ...[
+                Builder(
+                  builder: (context) {
+                    final desc = widget.listing.description!.trim();
+                    final isLong = desc.length > 45 || desc.contains('\n');
+
+                    if (!isLong) {
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 64, bottom: 10),
+                        child: Text(
+                          desc,
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontSize: 12.5,
+                            color: Colors.white.withValues(alpha: 0.88),
+                          ),
+                        ),
+                      );
+                    }
+
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 64, bottom: 10),
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _isDescriptionExpanded = !_isDescriptionExpanded;
+                          });
+                        },
+                        behavior: HitTestBehavior.opaque,
+                        child: AnimatedSize(
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeInOut,
+                          alignment: Alignment.topLeft,
+                          child: _isDescriptionExpanded
+                              ? ConstrainedBox(
+                                  constraints: const BoxConstraints(maxHeight: 140),
+                                  child: SingleChildScrollView(
+                                    physics: const BouncingScrollPhysics(),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          desc,
+                                          style: TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 12.5,
+                                            height: 1.35,
+                                            color: Colors.white.withValues(alpha: 0.95),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        const Text(
+                                          'show less',
+                                          style: TextStyle(
+                                            fontFamily: 'Poppins',
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: Color(0xFF2DD4BF),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              : Row(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        desc,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          fontFamily: 'Poppins',
+                                          fontSize: 12.5,
+                                          color: Colors.white.withValues(alpha: 0.88),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Text(
+                                      'see more',
+                                      style: TextStyle(
+                                        fontFamily: 'Poppins',
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF2DD4BF),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ] else
                 const SizedBox(height: 6),
 
@@ -956,7 +1074,7 @@ class _ReelPlayerCardState extends ConsumerState<ReelPlayerCard>
                         onPressed: () async {
                           ReelsControllerManager().pauseAll();
                           if (isAuction) {
-                            await context.push('/listing/${widget.listing.id}', extra: widget.listing);
+                            await context.push('/auction/${widget.listing.id}/bid');
                           } else {
                             await context.push('/chat/offer/${widget.listing.id}', extra: widget.listing);
                           }

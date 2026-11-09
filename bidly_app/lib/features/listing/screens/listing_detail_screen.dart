@@ -1,4 +1,4 @@
-import 'package:cached_network_image/cached_network_image.dart';
+﻿import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -363,7 +363,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> with 
               const Text('Listing not found', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () => context.pop(),
+                onPressed: () { if (Navigator.of(context).canPop()) { Navigator.of(context).pop(); } else if (context.canPop()) { context.pop(); } },
                 style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
                 child: const Text('Go Back', style: TextStyle(color: Colors.white)),
               ),

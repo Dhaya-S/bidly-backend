@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -27,4 +28,7 @@ public interface ListingLikeRepository extends JpaRepository<ListingLike, UUID> 
             @Param("userId") UUID userId,
             @Param("listingIds") Collection<UUID> listingIds
     );
+
+    @Query("SELECT l.listingId FROM ListingLike l WHERE l.userId = :userId ORDER BY l.createdAt DESC")
+    List<UUID> findListingIdsByUserId(@Param("userId") UUID userId);
 }

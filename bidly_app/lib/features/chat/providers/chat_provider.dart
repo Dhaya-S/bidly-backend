@@ -703,12 +703,20 @@ class ChatRoomListState {
 
 class ChatRoomListNotifier extends StateNotifier<ChatRoomListState> {
   final ApiClient _apiClient;
+  final String? _userId;
 
-  ChatRoomListNotifier(this._apiClient) : super(const ChatRoomListState()) {
-    fetchRooms();
+  ChatRoomListNotifier(this._apiClient, this._userId) : super(const ChatRoomListState()) {
+    if (_userId != null && _userId.isNotEmpty) {
+      fetchRooms();
+    }
   }
 
   Future<void> fetchRooms({bool isSilent = false}) async {
+    final token = await _apiClient.getToken();
+    if (token == null || token.isEmpty || _userId == null || _userId.isEmpty) {
+      state = const ChatRoomListState();
+      return;
+    }
     if (!isSilent && state.rooms.isEmpty) {
       state = state.copyWith(isLoading: true, error: null);
     }
@@ -735,12 +743,17 @@ class ChatRoomListNotifier extends StateNotifier<ChatRoomListState> {
     if (event.roomId == null) return;
     fetchRooms(isSilent: true);
   }
+
+  void clear() {
+    state = const ChatRoomListState();
+  }
 }
 
 final chatRoomListProvider =
     StateNotifierProvider<ChatRoomListNotifier, ChatRoomListState>((ref) {
   final apiClient = ref.watch(apiClientProvider);
-  return ChatRoomListNotifier(apiClient);
+  final userId = ref.watch(authProvider.select((s) => s.user?.id));
+  return ChatRoomListNotifier(apiClient, userId);
 });
 
 

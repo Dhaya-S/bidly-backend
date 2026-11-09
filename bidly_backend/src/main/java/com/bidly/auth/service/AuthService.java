@@ -63,7 +63,31 @@ public class AuthService {
     @Transactional
     public SendOtpResponse sendOtp(SendOtpRequest request) {
         String phone = normalizePhone(request.getMobile());
-        boolean isNewUser = !userRepository.existsByPhone(phone);
+        boolean userExists = userRepository.existsByPhone(phone);
+        boolean isNewUser = !userExists;
+        Boolean isSignUp = request.getIsSignUp();
+
+        if (Boolean.TRUE.equals(isSignUp) && userExists) {
+            throw BidlyException.badRequest("This mobile number is already registered. Please login instead.");
+        }
+
+        if (Boolean.FALSE.equals(isSignUp) && !userExists) {
+            throw BidlyException.badRequest("No account found with this mobile number. Please create an account.");
+        }
+
+        // Cooldown protection against spam & SMS balance drainage
+        Optional<OtpVerification> lastOpt = otpVerificationRepository
+                .findTopByPhoneAndVerifiedFalseOrderByCreatedAtDesc(phone);
+        if (lastOpt.isPresent()) {
+            OtpVerification lastSession = lastOpt.get();
+            if (lastSession.getCreatedAt() != null) {
+                long elapsedSeconds = java.time.Duration.between(lastSession.getCreatedAt(), java.time.Instant.now()).getSeconds();
+                if (elapsedSeconds < 25) {
+                    long waitSeconds = 25 - elapsedSeconds;
+                    throw BidlyException.badRequest("Please wait " + waitSeconds + " seconds before requesting a new OTP.");
+                }
+            }
+        }
 
         String requestId = fast2SmsService.sendOtp(phone);
 
@@ -93,7 +117,6 @@ public class AuthService {
     public AuthResponse verifyOtp(VerifyOtpRequest request) {
         String phone = normalizePhone(request.getMobile());
         String otp = request.getOtp().trim();
-        boolean isMagicOtp = "123456".equals(otp) || "000000".equals(otp);
 
         Optional<OtpVerification> sessionOpt = otpVerificationRepository
                 .findTopByPhoneAndVerifiedFalseOrderByCreatedAtDesc(phone);
@@ -102,20 +125,16 @@ public class AuthService {
         if (sessionOpt.isPresent()) {
             OtpVerification session = sessionOpt.get();
             sessionName = session.getName();
-            if (session.isExpired() && !isMagicOtp) {
+            if (session.isExpired()) {
                 otpVerificationRepository.deleteAllByPhone(phone);
                 throw BidlyException.badRequest("OTP has expired. Please request a new code.");
             }
-        } else if (!isMagicOtp) {
+        } else {
             throw BidlyException.badRequest("No pending OTP request found for this number. Please request a new OTP.");
         }
 
-        // Verify with Fast2SMS if not magic OTP
-        if (!isMagicOtp) {
-            fast2SmsService.verifyOtp(phone, otp);
-        } else {
-            log.info("Development Magic OTP '{}' used to authenticate phone: {}", otp, phone);
-        }
+        // Verify with Fast2SMS
+        fast2SmsService.verifyOtp(phone, otp);
 
         // Clean up OTP sessions
         otpVerificationRepository.deleteAllByPhone(phone);
@@ -155,8 +174,11 @@ public class AuthService {
      */
     @Transactional
     public SendOtpResponse resendOtp(String mobile) {
+        String phone = normalizePhone(mobile);
+        boolean userExists = userRepository.existsByPhone(phone);
         SendOtpRequest request = new SendOtpRequest();
-        request.setMobile(mobile);
+        request.setMobile(phone);
+        request.setSignUp(!userExists);
         return sendOtp(request);
     }
 

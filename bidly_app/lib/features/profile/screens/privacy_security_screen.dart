@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../auth/providers/auth_provider.dart';
-import 'change_password_screen.dart';
 import 'location_sharing_screen.dart';
 import 'data_privacy_screen.dart';
 import '../../settings/screens/delete_account_screen.dart';
@@ -67,18 +66,6 @@ class PrivacySecurityScreen extends ConsumerWidget {
                 children: [
                   _buildNavRow(
                     context,
-                    title: 'Change Password',
-                    subtitle: null,
-                    icon: Icons.lock_outline_rounded,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
-                      );
-                    },
-                  ),
-                  const Divider(height: 1, indent: 60, endIndent: 16),
-                  _buildNavRow(
-                    context,
                     title: 'Phone Verification',
                     subtitle: userPhone,
                     icon: Icons.phone_android_rounded,
@@ -98,7 +85,14 @@ class PrivacySecurityScreen extends ConsumerWidget {
                         ),
                       ),
                     ),
-                    onTap: () {},
+                    onTap: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Phone number $userPhone is securely verified via OTP.'),
+                          backgroundColor: const Color(0xFF10B981),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
+import '../../auth/providers/auth_provider.dart';
 
 class OrderTimelineEvent {
   final String status;
@@ -136,12 +137,21 @@ class OrdersState {
 
 class OrdersNotifier extends StateNotifier<OrdersState> {
   final ApiClient _apiClient;
+  final String? _userId;
 
-  OrdersNotifier(this._apiClient) : super(const OrdersState()) {
-    fetchOrders();
+  OrdersNotifier(this._apiClient, this._userId) : super(const OrdersState()) {
+    if (_userId != null && _userId.isNotEmpty) {
+      fetchOrders();
+    }
   }
 
   Future<void> fetchOrders({bool isSilent = false}) async {
+    final token = await _apiClient.getToken();
+    if (token == null || token.isEmpty || _userId == null || _userId.isEmpty) {
+      state = const OrdersState();
+      return;
+    }
+
     if (!isSilent && state.auctionOrders.isEmpty && state.directOrders.isEmpty) {
       state = state.copyWith(isLoading: true);
     }
@@ -182,9 +192,14 @@ class OrdersNotifier extends StateNotifier<OrdersState> {
   void selectOrder(OrderModel order) {
     state = state.copyWith(selectedOrder: order);
   }
+
+  void clear() {
+    state = const OrdersState();
+  }
 }
 
 final ordersProvider = StateNotifierProvider<OrdersNotifier, OrdersState>((ref) {
   final apiClient = ref.watch(apiClientProvider);
-  return OrdersNotifier(apiClient);
+  final userId = ref.watch(authProvider.select((s) => s.user?.id));
+  return OrdersNotifier(apiClient, userId);
 });

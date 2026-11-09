@@ -892,7 +892,10 @@ public class OrderService {
 
     @Transactional(readOnly = true)
     public List<OrderSummaryDto> getUserOrders(UUID currentUserId, String source, String role) {
-        List<Order> orders = new ArrayList<>();
+        if (currentUserId == null) {
+            return Collections.emptyList();
+        }
+        Set<Order> orders = new LinkedHashSet<>();
         if ("SELLER".equalsIgnoreCase(role)) {
             orders.addAll(orderRepository.findBySellerIdOrderByCreatedAtDesc(currentUserId));
         } else if ("BUYER".equalsIgnoreCase(role)) {

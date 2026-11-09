@@ -1,3 +1,4 @@
+﻿import 'package:share_plus/share_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -72,7 +73,7 @@ class _AuctionWonScreenState extends ConsumerState<AuctionWonScreen> {
         elevation: 0.5,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-          onPressed: () => context.pop(),
+          onPressed: () { if (Navigator.of(context).canPop()) { Navigator.of(context).pop(); } else if (context.canPop()) { context.pop(); } },
         ),
         title: const Text(
           'Auction Won',
@@ -81,7 +82,11 @@ class _AuctionWonScreenState extends ConsumerState<AuctionWonScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.share_outlined, size: 20),
-            onPressed: () {},
+            onPressed: () {
+              final title = productTitle.isNotEmpty ? productTitle : 'an item';
+              final price = currencyFormatter.format(wonPrice);
+              Share.share('🎉 I just won "' + title + '" for ' + price + ' on Bidly! Check out live auctions on Bidly Marketplace.');
+            },
           ),
         ],
       ),
@@ -507,7 +512,11 @@ class _AuctionWonScreenState extends ConsumerState<AuctionWonScreen> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: OutlinedButton.icon(
-                            onPressed: () {},
+                            onPressed: () {
+                              final title = productTitle.isNotEmpty ? productTitle : 'an item';
+                              final price = currencyFormatter.format(wonPrice);
+                              Share.share('🎉 I just won "' + title + '" for ' + price + ' on Bidly! Check out live auctions on Bidly Marketplace.');
+                            },
                             icon: const Icon(Icons.share_outlined, size: 16, color: Color(0xFF475569)),
                             label: const Text('Share Win', style: TextStyle(fontFamily: 'Poppins', fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF475569))),
                             style: OutlinedButton.styleFrom(

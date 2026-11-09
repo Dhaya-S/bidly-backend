@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_client.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../explore/models/listing_model.dart';
 
 class WishlistState {
@@ -28,12 +29,21 @@ class WishlistState {
 
 class WishlistNotifier extends StateNotifier<WishlistState> {
   final ApiClient _apiClient;
+  final String? _userId;
 
-  WishlistNotifier(this._apiClient) : super(const WishlistState()) {
-    fetchWishlist();
+  WishlistNotifier(this._apiClient, this._userId) : super(const WishlistState()) {
+    if (_userId != null && _userId.isNotEmpty) {
+      fetchWishlist();
+    }
   }
 
   Future<void> fetchWishlist({bool isSilent = false}) async {
+    final token = await _apiClient.getToken();
+    if (token == null || token.isEmpty || _userId == null || _userId.isEmpty) {
+      state = const WishlistState();
+      return;
+    }
+
     if (!isSilent && state.items.isEmpty) {
       state = state.copyWith(isLoading: true, error: null);
     }
@@ -89,10 +99,15 @@ class WishlistNotifier extends StateNotifier<WishlistState> {
       }
     }
   }
+
+  void clear() {
+    state = const WishlistState();
+  }
 }
 
 final wishlistProvider =
     StateNotifierProvider<WishlistNotifier, WishlistState>((ref) {
   final apiClient = ref.watch(apiClientProvider);
-  return WishlistNotifier(apiClient);
+  final userId = ref.watch(authProvider.select((s) => s.user?.id));
+  return WishlistNotifier(apiClient, userId);
 });

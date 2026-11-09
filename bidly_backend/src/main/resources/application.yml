@@ -89,11 +89,11 @@ fast2sms:
   send-url: https://www.fast2sms.com/dev/otp/send
   verify-url: https://www.fast2sms.com/dev/otp/verify
 
-# ─── Bidly Dev Features ──────────────────────────────────────
-bidly:
-  dev-wallet:
-    enabled: ${DEV_WALLET_ENABLED:true}
-    initial-balance: 50000.00
+# ─── Razorpay Credentials ────────────────────────────────────
+razorpay:
+  key-id: ${RAZORPAY_KEY_ID:rzp_live_SRoJY9zxg1WtPH}
+  key-secret: ${RAZORPAY_KEY_SECRET:2yeMB1dC2fJNcfq0t5ZVPiP2}
+  webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}
 
 # ─── Logging ─────────────────────────────────────────────────
 logging:

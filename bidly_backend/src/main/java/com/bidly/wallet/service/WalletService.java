@@ -21,12 +21,6 @@ public class WalletService {
     private final WalletTransactionRepository transactionRepository;
     private final UserRepository userRepository;
 
-    @org.springframework.beans.factory.annotation.Value("${bidly.dev-wallet.enabled:true}")
-    private boolean devWalletEnabled;
-
-    @org.springframework.beans.factory.annotation.Value("${bidly.dev-wallet.initial-balance:50000.00}")
-    private BigDecimal devInitialBalance;
-
     public WalletService(WalletRepository walletRepository,
                          WalletTransactionRepository transactionRepository,
                          UserRepository userRepository) {
@@ -37,37 +31,14 @@ public class WalletService {
 
     @Transactional
     public Wallet getOrCreateWalletEntity(UUID userId) {
-        Wallet wallet = walletRepository.findByUserId(userId).orElseGet(() -> {
+        return walletRepository.findByUserId(userId).orElseGet(() -> {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> BidlyException.notFound("User not found: " + userId));
             Wallet newWallet = new Wallet(user);
-            if (devWalletEnabled && devInitialBalance != null && devInitialBalance.compareTo(BigDecimal.ZERO) > 0) {
-                newWallet.setBalance(devInitialBalance);
-                newWallet.setReservedBalance(BigDecimal.ZERO);
-                Wallet saved = walletRepository.save(newWallet);
-                WalletTransaction initTx = new WalletTransaction(
-                        saved,
-                        devInitialBalance,
-                        WalletTransaction.TransactionType.CREDIT,
-                        null,
-                        "INITIAL_CREDIT",
-                        "[DEV] Initial development test wallet balance"
-                );
-                transactionRepository.save(initTx);
-                return saved;
-            }
+            newWallet.setBalance(BigDecimal.ZERO);
+            newWallet.setReservedBalance(BigDecimal.ZERO);
             return walletRepository.save(newWallet);
         });
-
-        // Ensure development test wallets always maintain at least ₹50,000 baseline when unreserved
-        if (devWalletEnabled && devInitialBalance != null
-                && wallet.getBalance().compareTo(devInitialBalance) < 0
-                && wallet.getReservedBalance().compareTo(BigDecimal.ZERO) == 0) {
-            wallet.setBalance(devInitialBalance);
-            wallet = walletRepository.save(wallet);
-        }
-
-        return wallet;
     }
 
     @Transactional(readOnly = true)
@@ -108,6 +79,55 @@ public class WalletService {
                 description != null ? description : "Wallet balance top-up"
         );
         transactionRepository.save(tx);
+
+        return new WalletDto(
+                wallet.getId(),
+                wallet.getBalance(),
+                wallet.getReservedBalance(),
+                wallet.getAvailableBalance()
+        );
+    }
+
+    /**
+     * Cryptographically verified Razorpay credit with idempotency protection.
+     */
+    @Transactional
+    public WalletDto creditFromRazorpay(UUID userId, BigDecimal amount, String paymentLinkId, String paymentId) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw BidlyException.badRequest("Credit amount must be greater than zero");
+        }
+
+        Wallet wallet = walletRepository.findByUserIdWithLock(userId).orElseGet(() -> {
+            User user = userRepository.findById(userId)
+                    .orElseThrow(() -> BidlyException.notFound("User not found: " + userId));
+            return walletRepository.save(new Wallet(user));
+        });
+
+        String marker = "[RAZORPAY:" + (paymentId != null ? paymentId : paymentLinkId) + "]";
+        boolean alreadyCredited = transactionRepository.findByWalletIdOrderByCreatedAtDesc(wallet.getId()).stream()
+                .anyMatch(t -> t.getDescription() != null && t.getDescription().contains(marker));
+
+        if (alreadyCredited) {
+            return new WalletDto(
+                    wallet.getId(),
+                    wallet.getBalance(),
+                    wallet.getReservedBalance(),
+                    wallet.getAvailableBalance()
+            );
+        }
+
+        wallet.setBalance(wallet.getBalance().add(amount));
+        walletRepository.save(wallet);
+
+        WalletTransaction creditTx = new WalletTransaction(
+                wallet,
+                amount,
+                WalletTransaction.TransactionType.CREDIT,
+                null,
+                "RAZORPAY",
+                "Razorpay wallet credit " + marker + " (Link: " + paymentLinkId + ")"
+        );
+        transactionRepository.save(creditTx);
 
         return new WalletDto(
                 wallet.getId(),
@@ -206,20 +226,9 @@ public class WalletService {
                     .orElseThrow(() -> BidlyException.notFound("User not found: " + userId));
             return walletRepository.save(new Wallet(user));
         });
-        BigDecimal resetAmt = devInitialBalance != null ? devInitialBalance : BigDecimal.valueOf(50000.00);
-        wallet.setBalance(resetAmt);
+        wallet.setBalance(BigDecimal.ZERO);
         wallet.setReservedBalance(BigDecimal.ZERO);
         Wallet saved = walletRepository.save(wallet);
-
-        WalletTransaction tx = new WalletTransaction(
-                saved,
-                resetAmt,
-                WalletTransaction.TransactionType.CREDIT,
-                null,
-                "DEV_RESET",
-                "[DEV] Reset test wallet balance"
-        );
-        transactionRepository.save(tx);
         return new WalletDto(saved.getId(), saved.getBalance(), saved.getReservedBalance(), saved.getAvailableBalance());
     }
 }

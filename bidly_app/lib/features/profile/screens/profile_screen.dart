@@ -9,6 +9,7 @@ import '../../chat/providers/chat_provider.dart';
 import '../providers/notifications_provider.dart';
 import '../providers/wishlist_provider.dart';
 import '../providers/orders_provider.dart';
+import '../providers/wallet_provider.dart';
 import 'personal_information_screen.dart';
 import '../../subscription/screens/seller_subscription_screen.dart';
 
@@ -83,6 +84,7 @@ class ProfileScreen extends ConsumerWidget {
     final chatListState = ref.watch(chatRoomListProvider);
     final wishlistState = ref.watch(wishlistProvider);
     final ordersState = ref.watch(ordersProvider);
+    final walletState = ref.watch(walletProvider);
 
     final totalUnreadMessages = chatListState.rooms.fold<int>(0, (sum, r) => sum + r.unreadCount);
     final messagesDisplayCount = totalUnreadMessages > 0 ? totalUnreadMessages : chatListState.rooms.length;
@@ -332,11 +334,14 @@ class ProfileScreen extends ConsumerWidget {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'You need wallet balance to participate in auctions',
+                            walletState.balance > 0
+                                ? 'Current Balance: ₹${walletState.balance.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]},')} · Tap to add'
+                                : 'Current Balance: ₹0 · Top up to bid in auctions',
                             style: TextStyle(
                               fontFamily: 'Poppins',
-                              fontSize: 10.5,
-                              color: Colors.white.withValues(alpha: 0.8),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white.withValues(alpha: 0.9),
                             ),
                           ),
                         ],

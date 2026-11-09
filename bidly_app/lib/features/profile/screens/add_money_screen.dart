@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -58,10 +60,17 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen> {
     } else {
       _amountController = TextEditingController(text: '500');
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(walletProvider.notifier).fetchWallet();
+    });
   }
+
+  Timer? _statusPollTimer;
+  bool _isCheckingStatus = false;
 
   @override
   void dispose() {
+    _statusPollTimer?.cancel();
     _amountController.dispose();
     super.dispose();
   }
@@ -85,31 +94,232 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen> {
       return;
     }
 
-    final txn = await ref.read(walletProvider.notifier).topUp(
-          amount: amount,
-          paymentMethod: _selectedPaymentMethod,
-        );
+    // 1. Create real Razorpay payment link via backend
+    final plinkData = await ref.read(walletProvider.notifier).createRazorpayPaymentLink(amount);
+    if (!mounted) return;
 
-    if (mounted && txn != null) {
-      final res = await Navigator.of(context).push<bool>(
-        MaterialPageRoute(
-          builder: (_) => MoneyAddedSuccessScreen(
-            transaction: txn,
-            isFromBidding: widget.minTopUp != null,
-          ),
-        ),
-      );
-      if (res == true && mounted) {
-        Navigator.of(context).pop(true);
-      }
-    } else if (mounted) {
-      final err = ref.read(walletProvider).errorMessage ?? 'Payment failed. Please try again.';
+    if (plinkData == null) {
+      final err = ref.read(walletProvider).errorMessage ?? 'Failed to initialize Razorpay payment. Please try again.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(err),
           backgroundColor: AppTheme.error,
         ),
       );
+      return;
+    }
+
+    final shortUrl = plinkData['shortUrl']?.toString();
+    final paymentLinkId = plinkData['paymentLinkId']?.toString();
+
+    if (shortUrl == null || shortUrl.isEmpty || paymentLinkId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Invalid payment link returned by Razorpay.'),
+          backgroundColor: AppTheme.error,
+        ),
+      );
+      return;
+    }
+
+    // 2. Launch Razorpay Checkout in browser/UPI
+    final uri = Uri.parse(shortUrl);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      try {
+        await launchUrl(uri);
+      } catch (err) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not open payment link: $err'),
+              backgroundColor: AppTheme.error,
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    // 3. Show live awaiting payment modal with automatic real-time status verification
+    _showPaymentWaitingModal(paymentLinkId, amount);
+  }
+
+  void _showPaymentWaitingModal(String paymentLinkId, double amount) {
+    int attempts = 0;
+    const maxAttempts = 60; // 60 * 2.5s = 2.5 minutes
+    bool isModalOpen = true;
+
+    _statusPollTimer?.cancel();
+    _statusPollTimer = Timer.periodic(const Duration(milliseconds: 2500), (timer) async {
+      attempts++;
+      if (attempts >= maxAttempts) {
+        timer.cancel();
+        return;
+      }
+
+      if (_isCheckingStatus) return;
+      _isCheckingStatus = true;
+
+      try {
+        final txn = await ref.read(walletProvider.notifier).checkRazorpayPaymentLinkStatus(paymentLinkId);
+        if (txn != null) {
+          timer.cancel();
+          if (isModalOpen && mounted) {
+            Navigator.of(context).pop(); // dismiss waiting modal
+          }
+          if (mounted) {
+            _navigateToSuccess(txn);
+          }
+        }
+      } finally {
+        _isCheckingStatus = false;
+      }
+    });
+
+    showModalBottomSheet(
+      context: context,
+      isDismissible: true,
+      enableDrag: false,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppTheme.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFE6F4F2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF004E54)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'Complete Payment',
+                    style: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'We opened Razorpay. Approve the payment of ₹${amount.toInt()} in Google Pay, PhonePe, Paytm, or your bank app, then return here.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontFamily: 'Poppins',
+                      fontSize: 13,
+                      height: 1.4,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        setModalState(() {});
+                        final txn = await ref.read(walletProvider.notifier).checkRazorpayPaymentLinkStatus(paymentLinkId);
+                        if (txn != null) {
+                          _statusPollTimer?.cancel();
+                          if (mounted) {
+                            Navigator.of(sheetCtx).pop();
+                            _navigateToSuccess(txn);
+                          }
+                        } else if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Payment not completed yet. Please finish in your UPI app.'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF004E54),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'I Have Paid · Check Status',
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextButton(
+                    onPressed: () {
+                      _statusPollTimer?.cancel();
+                      ref.read(walletProvider.notifier).resetAddingState();
+                      Navigator.of(sheetCtx).pop();
+                    },
+                    child: const Text(
+                      'Cancel Payment',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 13,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(() {
+      isModalOpen = false;
+      _statusPollTimer?.cancel();
+      ref.read(walletProvider.notifier).resetAddingState();
+    });
+  }
+
+  Future<void> _navigateToSuccess(WalletTransaction txn) async {
+    final res = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => MoneyAddedSuccessScreen(
+          transaction: txn,
+          isFromBidding: widget.minTopUp != null,
+        ),
+      ),
+    );
+    if (res == true && mounted) {
+      Navigator.of(context).pop(true);
     }
   }
 
@@ -128,7 +338,7 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: AppTheme.textPrimary),
-          onPressed: () => context.pop(),
+          onPressed: () { if (Navigator.of(context).canPop()) { Navigator.of(context).pop(); } else if (context.canPop()) { context.pop(); } },
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -520,13 +730,21 @@ class _AddMoneyScreenState extends ConsumerState<AddMoneyScreen> {
 
               // ── 7. Encryption Security Footer ─────────────────────
               Center(
-                child: Text(
-                  'Secured by 256-bit encryption · BIDLY Pay',
-                  style: TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 11,
-                    color: AppTheme.textSecondary.withValues(alpha: 0.8),
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.verified_user_outlined, size: 14, color: Color(0xFF004E54)),
+                    const SizedBox(width: 5),
+                    Text(
+                      'Secured by Razorpay · 256-bit Bank Grade Encryption',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textSecondary.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 24),

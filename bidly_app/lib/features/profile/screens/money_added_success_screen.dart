@@ -25,9 +25,23 @@ class MoneyAddedSuccessScreen extends ConsumerWidget {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
           child: Column(
             children: [
+              // Top Close button
+              Align(
+                alignment: Alignment.centerLeft,
+                child: IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 22, color: AppTheme.textPrimary),
+                  onPressed: () {
+                    ref.read(walletProvider.notifier).fetchWallet();
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop();
+                    }
+                  },
+                ),
+              ),
+
               const Spacer(flex: 1),
 
               // Large Success Checkmark Circle
@@ -206,8 +220,12 @@ class MoneyAddedSuccessScreen extends ConsumerWidget {
                 child: InkWell(
                   onTap: () {
                     ref.read(walletProvider.notifier).fetchWallet();
-                    Navigator.of(context).pop(); // pop success
-                    Navigator.of(context).pop(); // pop add money back to profile
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop(); // pop success
+                    }
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop(); // pop add money back to profile
+                    }
                   },
                   borderRadius: BorderRadius.circular(14),
                   child: Row(

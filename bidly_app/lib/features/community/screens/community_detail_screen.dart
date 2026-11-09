@@ -1,3 +1,4 @@
+import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -236,11 +237,12 @@ class _CommunityDetailScreenState extends ConsumerState<CommunityDetailScreen> {
             ListTile(
               leading: const Icon(Icons.phone_outlined, color: Color(0xFF004E54)),
               title: const Text('Call Seller', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600)),
-              onTap: () {
+              onTap: () async {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Calling $sellerName...')),
-                );
+                final uri = Uri.parse('tel:');
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri);
+                }
               },
             ),
             const SizedBox(height: 12),

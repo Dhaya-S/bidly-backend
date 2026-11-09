@@ -1,3 +1,4 @@
+﻿import '../../profile/screens/report_problem_screen.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -852,7 +853,7 @@ class _OfferChatScreenState extends ConsumerState<OfferChatScreen> {
                 ),
                 child: IconButton(
                   icon: const Icon(Icons.arrow_back, size: 18, color: AppTheme.textPrimary),
-                  onPressed: () => context.pop(),
+                  onPressed: () { if (Navigator.of(context).canPop()) { Navigator.of(context).pop(); } else if (context.canPop()) { context.pop(); } },
                   padding: EdgeInsets.zero,
                 ),
               ),
@@ -916,15 +917,27 @@ class _OfferChatScreenState extends ConsumerState<OfferChatScreen> {
               actions: [
                 IconButton(
                   icon: const Icon(Icons.phone_outlined, color: Color(0xFF004E54), size: 21),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Calling peer via secure relay...')),
-                    );
+                  onPressed: () async {
+                    final uri = Uri.parse('tel:');
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri);
+                    }
                   },
                 ),
-                IconButton(
+                PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert, color: Color(0xFF64748B), size: 21),
-                  onPressed: () {},
+                  onSelected: (val) {
+                    if (val == 'listing' && widget.listingId.isNotEmpty) {
+                      context.push('/listing/${widget.listingId}');
+                    } else if (val == 'report') {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const ReportProblemScreen()));
+                    }
+                  },
+                  itemBuilder: (ctx) => [
+                    if (widget.listingId.isNotEmpty)
+                      const PopupMenuItem(value: 'listing', child: Text('View Listing')),
+                    const PopupMenuItem(value: 'report', child: Text('Report User')),
+                  ],
                 ),
                 const SizedBox(width: 4),
               ],
@@ -4648,7 +4661,7 @@ class _OfferChatScreenState extends ConsumerState<OfferChatScreen> {
               elevation: 0,
               leading: IconButton(
                 icon: const Icon(Icons.close, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () { if (Navigator.of(context).canPop()) { Navigator.of(context).pop(); } else if (context.canPop()) { context.pop(); } },
               ),
               title: Text(
                 msg.senderName ?? 'Photo',

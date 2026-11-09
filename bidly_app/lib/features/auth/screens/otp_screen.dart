@@ -56,6 +56,16 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
     super.dispose();
   }
 
+  void _navigateBack() {
+    if (context.canPop()) {
+      context.pop();
+    } else if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      context.go(AppRoutes.phoneEntry);
+    }
+  }
+
   Future<void> _handleVerify() async {
     final code = _pinController.text.trim();
     if (code.length < 6) {
@@ -166,18 +176,18 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: GestureDetector(
-                  onTap: () => context.pop(),
+                  onTap: _navigateBack,
                   child: Container(
-                    width: 36,
-                    height: 36,
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
                       color: Colors.white,
                       shape: BoxShape.circle,
                       border: Border.all(color: AppTheme.border, width: 1.2),
                     ),
                     child: const Icon(
-                      Icons.chevron_left_rounded,
-                      size: 22,
+                      Icons.arrow_back_ios_new_rounded,
+                      size: 16,
                       color: AppTheme.textPrimary,
                     ),
                   ),
@@ -233,52 +243,19 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Expiration Countdown Timer & Quick Magic OTP
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    _secondsRemaining > 0
-                        ? 'Expires in 00:${_secondsRemaining.toString().padLeft(2, '0')}'
-                        : 'Code expired',
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: _secondsRemaining > 0 ? AppTheme.textSecondary : AppTheme.error,
-                    ),
+              // Expiration Countdown Timer
+              Center(
+                child: Text(
+                  _secondsRemaining > 0
+                      ? 'Expires in 00:${_secondsRemaining.toString().padLeft(2, '0')}'
+                      : 'Code expired',
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: _secondsRemaining > 0 ? AppTheme.textSecondary : AppTheme.error,
                   ),
-                  GestureDetector(
-                    onTap: () {
-                      _pinController.text = '123456';
-                      _handleVerify();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE6F4F1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: const Color(0xFF004E54).withValues(alpha: 0.3)),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.bolt_rounded, size: 14, color: Color(0xFF004E54)),
-                          SizedBox(width: 2),
-                          Text(
-                            'Dev OTP: 123456',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: Color(0xFF004E54),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
               const SizedBox(height: 24),
 
@@ -351,7 +328,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
 
               // Change Phone Number
               GestureDetector(
-                onTap: () => context.pop(),
+                onTap: _navigateBack,
                 child: const Text(
                   'Change Phone Number',
                   style: TextStyle(

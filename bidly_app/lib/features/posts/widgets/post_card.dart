@@ -7,9 +7,12 @@ import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 import '../../../core/api/api_client.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../core/providers/live_location_provider.dart';
 import '../../../core/widgets/bidly_snackbar.dart';
+import '../../auth/models/auth_state.dart';
+import '../../auth/providers/auth_provider.dart';
 import '../../explore/models/listing_model.dart';
 import '../models/post_model.dart';
 import '../providers/posts_provider.dart';
@@ -226,7 +229,22 @@ class _PostCardState extends ConsumerState<PostCard>
     }
   }
 
+  bool _ensureAuthenticated() {
+    final authState = ref.read(authProvider);
+    if (authState.status != AuthStatus.authenticated || authState.user == null) {
+      BidlySnackBar.show(
+        context: context,
+        message: 'Please sign in to like posts',
+        icon: Icons.favorite_border_rounded,
+      );
+      context.push(AppRoutes.login);
+      return false;
+    }
+    return true;
+  }
+
   void _triggerDoubleTapHeart() {
+    if (!_ensureAuthenticated()) return;
     final isCurrentlyLiked = ref
         .read(postsProvider)
         .isLiked(widget.post.id, widget.post.isLikedByMe);
@@ -245,6 +263,7 @@ class _PostCardState extends ConsumerState<PostCard>
   }
 
   void _handleSingleTapLike() {
+    if (!_ensureAuthenticated()) return;
     final isCurrentlyLiked = ref
         .read(postsProvider)
         .isLiked(widget.post.id, widget.post.isLikedByMe);
@@ -730,8 +749,11 @@ class _PostCardState extends ConsumerState<PostCard>
                               if (mounted) setState(() {});
                               if (post.listingId != null &&
                                   post.listingId!.isNotEmpty) {
-                                await context
-                                    .push('/listing/${post.listingId}');
+                                if (post.isAuction) {
+                                  await context.push('/auction/${post.listingId}/bid');
+                                } else {
+                                  await context.push('/listing/${post.listingId}');
+                                }
                               } else {
                                 _showDetailsBottomSheet(context, post);
                               }

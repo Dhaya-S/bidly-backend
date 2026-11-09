@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/app_theme.dart';
 
 class RateBidlyScreen extends StatefulWidget {
@@ -19,14 +20,44 @@ class _RateBidlyScreenState extends State<RateBidlyScreen> {
     super.dispose();
   }
 
-  void _handleSubmit() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Thank you for rating Bidly! ⭐⭐⭐⭐⭐'),
-        backgroundColor: AppTheme.success,
-      ),
-    );
-    context.pop();
+  Future<void> _handleSubmit() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final nav = Navigator.of(context);
+
+    if (_rating >= 4) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Thank you! Redirecting to Google Play Store... ⭐'),
+          backgroundColor: AppTheme.success,
+        ),
+      );
+      final playStoreUri = Uri.parse('market://details?id=com.bidly.bidly_app');
+      final webPlayStoreUri = Uri.parse('https://play.google.com/store/apps/details?id=com.bidly.bidly_app');
+      try {
+        if (await canLaunchUrl(playStoreUri)) {
+          await launchUrl(playStoreUri, mode: LaunchMode.externalApplication);
+        } else {
+          await launchUrl(webPlayStoreUri, mode: LaunchMode.externalApplication);
+        }
+      } catch (_) {
+        // Fallback gracefully if store is not available
+      }
+    } else {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Thank you for your valuable feedback! Our team will review your comments.'),
+          backgroundColor: AppTheme.primary,
+        ),
+      );
+    }
+
+    if (mounted) {
+      if (nav.canPop()) {
+        nav.pop();
+      } else {
+        context.pop();
+      }
+    }
   }
 
   @override
@@ -38,7 +69,7 @@ class _RateBidlyScreenState extends State<RateBidlyScreen> {
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: AppTheme.textPrimary),
-          onPressed: () => context.pop(),
+          onPressed: () { if (Navigator.of(context).canPop()) { Navigator.of(context).pop(); } else if (context.canPop()) { context.pop(); } },
         ),
         title: const Text(
           'Rate Bidly',
