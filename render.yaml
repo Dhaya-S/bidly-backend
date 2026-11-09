@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: bidly-backend
+    runtime: docker
+    rootDir: bidly_backend
+    dockerfilePath: Dockerfile
+    dockerContext: .
+    plan: starter
+    region: singapore
+    healthCheckPath: /api/categories
+    envVars:
+      - key: PORT
+        value: 8081
+      - key: NEON_DB_URL
+        sync: false
+      - key: NEON_DB_USERNAME
+        sync: false
+      - key: NEON_DB_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: CF_ACCOUNT_ID
+        sync: false
+      - key: CF_R2_ACCESS_KEY_ID
+        sync: false
+      - key: CF_R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: CF_R2_BUCKET_NAME
+        sync: false
+      - key: CF_R2_PUBLIC_URL
+        sync: false
+      - key: FAST2SMS_API_KEY
+        sync: false
+      - key: FAST2SMS_OTP_ID
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+
